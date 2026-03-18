@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCTV AI Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#07080a; --bg2:#0e1014; --bg3:#141720;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.14);
+    --accent:#00e5a0; --red:#ff4757; --amber:#ffb830;
+    --text:#e8eaf0; --muted:#6b7280; --muted2:#9ca3af;
+    --mono:'DM Mono',monospace; --sans:'Syne',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,160,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+  .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s ease;z-index:1;}
+  .screen.active{opacity:1;pointer-events:all;}
+  @keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  .screen.active>*{animation:up .38s ease forwards;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* BAR */
+  .bar{position:absolute;top:0;left:0;right:0;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 26px;gap:12px;z-index:10;}
+  .logo{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+  .sep{width:1px;height:18px;background:var(--border2);}
+  .bar-title{font-family:var(--mono);font-size:12px;color:var(--muted2);}
+  .bar-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite;}
+  .live-txt{font-family:var(--mono);font-size:11px;color:var(--accent);}
+  .clock{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .bc{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .bc.done{color:var(--accent);cursor:pointer;}.bc.done:hover{text-decoration:underline;}
+  .bc.active{color:var(--text);font-weight:500;}
+  .bc-arr{color:var(--muted);font-size:10px;}
+  .selected-room-pill{font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--accent);padding:2px 10px;border-radius:5px;font-weight:500;}
+
+  /* BUTTONS */
+  .btn{padding:13px 24px;background:var(--accent);border:none;border-radius:10px;color:#07080a;font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .2s,transform .1s;}
+  .btn:hover{background:#00ffb3;}.btn:active{transform:scale(.98);}
+  .btn:disabled{opacity:.35;cursor:default;pointer-events:none;}
+
+  /* ═══ S1 LOGIN ═══ */
+  .login-card{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:48px 40px;width:380px;position:relative;overflow:hidden;}
+  .login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+  .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:30px;}
+  .li{width:36px;height:36px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;}
+  .li svg{width:20px;height:20px;}
+  .ln{font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+  .ls{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;}
+  .lh{font-size:26px;font-weight:800;margin-bottom:4px;}
+  .lhint{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:26px;}
+  .flbl{font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;}
+  .fwrap{margin-bottom:14px;}
+  .fi{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:14px;outline:none;transition:border-color .2s;}
+  .fi:focus{border-color:var(--accent);}.fi::placeholder{color:var(--muted);}
+  .lbadge{font-family:var(--mono);font-size:10px;color:var(--accent);text-align:center;margin-top:16px;opacity:.5;}
+
+  /* ═══ S2 DASHBOARD ═══ */
+  #s-dash{flex-direction:column;}
+  .dash-body{padding:70px 26px 22px;width:100%;height:100%;display:flex;flex-direction:column;gap:14px;}
+  .sec-t{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;}
+  .rooms-wrap{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;}
+  .rooms-wrap::after{content:'CAMPUS A · LIVE';position:absolute;top:13px;right:14px;font-family:var(--mono);font-size:10px;color:var(--accent);opacity:.6;}
+  .rooms-hint{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px;opacity:.8;}
+  .rooms-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+  .room-box{aspect-ratio:4/3;border-radius:10px;background:var(--bg3);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:border-color .2s,background .15s,transform .15s;position:relative;padding:6px;user-select:none;}
+  .room-box:hover{border-color:var(--border2);background:#1a1e28;transform:scale(1.04);}
+  .room-box:active{transform:scale(.97);}
+  .room-box.on{border-color:rgba(0,229,160,.25);}
+  .room-box.on:hover{border-color:rgba(0,229,160,.6);background:rgba(0,229,160,.05);}
+  .rb-id{font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:.04em;}
+  .rb-name{font-family:var(--mono);font-size:10px;color:var(--muted2);font-weight:500;text-align:center;line-height:1.3;}
+  .rb-dot{position:absolute;bottom:5px;right:6px;width:5px;height:5px;border-radius:50%;}
+  .room-box.on .rb-dot{background:var(--accent);}
+  .room-box:not(.on) .rb-dot{background:var(--muted);opacity:.4;}
+  .dash-stats{display:flex;gap:10px;}
+  .sc{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;}
+  .sc-v{font-family:var(--mono);font-size:20px;font-weight:500;}
+  .sc-l{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.4;}
+
+  /* ═══ S3 MODE ═══ */
+  #s-mode{flex-direction:column;}
+  .mode-body{padding:70px 26px 22px;width:100%;height:100%;display:flex;flex-direction:column;gap:16px;}
+  .mode-row{display:flex;gap:12px;}
+  .mode-card{flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:20px 22px;cursor:pointer;display:flex;align-items:center;gap:16px;position:relative;overflow:hidden;transition:border-color .2s;}
+  .mode-card.sel{border-color:var(--accent);}
+  .mode-card.sel::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);}
+  .mi-box{width:44px;height:44px;border-radius:12px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color .2s;}
+  .mode-card.sel .mi-box{border-color:var(--accent);}
+  .mi-box svg{width:20px;height:20px;color:var(--muted2);transition:color .2s;}
+  .mode-card.sel .mi-box svg{color:var(--accent);}
+  .mi-info{flex:1;}.mi-name{font-size:16px;font-weight:700;margin-bottom:2px;}
+  .mi-desc{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .mi-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color .2s;}
+  .mode-card.sel .mi-radio{border-color:var(--accent);}
+  .mi-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:0;transition:opacity .2s;}
+  .mode-card.sel .mi-dot{opacity:1;}
+
+  /* RT panel */
+  .rt-panel{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:18px 20px;flex:1;display:none;flex-direction:column;gap:14px;}
+  .rt-panel.show{display:flex;}
+  .rt-panel-top{display:flex;align-items:center;justify-content:space-between;}
+  .rt-panel-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+  .rt-count{font-family:var(--mono);font-size:11px;color:var(--accent);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.2);border-radius:6px;padding:2px 10px;}
+  .rt-slots{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;}
+  .cam-slot{width:178px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;}
+  .cs-thumb{width:100%;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;position:relative;}
+  .cs-thumb svg{width:22px;height:22px;color:var(--muted);opacity:.25;}
+  .cs-live{position:absolute;top:5px;left:6px;font-family:var(--mono);font-size:8px;color:var(--red);display:flex;align-items:center;gap:4px;}
+  .cs-live-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;}
+  .cs-info{padding:8px 10px;}
+  .cs-name{font-family:var(--mono);font-size:11px;font-weight:500;}
+  .cs-loc{font-family:var(--mono);font-size:10px;color:var(--muted);}
+  .cs-remove{position:absolute;top:5px;right:6px;width:18px;height:18px;border-radius:50%;background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:9px;color:var(--red);transition:background .15s;}
+  .cs-remove:hover{background:rgba(255,71,87,.3);}
+  .cam-add{width:178px;min-height:120px;background:var(--bg3);border:1.5px dashed var(--border2);border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;flex-shrink:0;transition:border-color .2s,background .2s;}
+  .cam-add:hover{border-color:var(--accent);background:rgba(0,229,160,.04);}
+  .cam-add-icon{width:34px;height:34px;border-radius:50%;background:var(--bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted);transition:color .2s,border-color .2s;line-height:1;}
+  .cam-add:hover .cam-add-icon{color:var(--accent);border-color:var(--accent);}
+  .cam-add span{font-family:var(--mono);font-size:10px;color:var(--muted);}
+
+  /* Video upload panel */
+  .upload-panel{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;flex:1;display:none;flex-direction:column;gap:14px;}
+  .upload-panel.show{display:flex;}
+  .upload-area{flex:1;border:2px dashed var(--border2);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;transition:border-color .2s,background .2s;position:relative;min-height:160px;}
+  .upload-area:hover,.upload-area.drag{border-color:var(--accent);background:rgba(0,229,160,.04);}
+  .upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .upload-icon{width:48px;height:48px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;}
+  .upload-icon svg{width:22px;height:22px;color:var(--muted);}
+  .upload-area.has-file .upload-icon svg{color:var(--accent);}
+  .upload-title{font-family:var(--mono);font-size:13px;color:var(--muted2);font-weight:500;}
+  .upload-sub{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .upload-filename{font-family:var(--mono);font-size:12px;color:var(--accent);display:none;}
+  .upload-area.has-file .upload-filename{display:block;}
+  .upload-area.has-file .upload-sub{display:none;}
+  .upload-area.has-file .upload-title{display:none;}
+  .upload-meta{display:flex;gap:10px;}
+  .upload-chip{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:10px;color:var(--muted2);}
+
+  /* picker overlay */
+  .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(7,8,10,.8);backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:opacity .2s;}
+  .overlay.open{opacity:1;pointer-events:all;}
+  .picker-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:420px;max-width:90vw;transform:translateY(6px);transition:transform .2s;}
+  .overlay.open .picker-modal{transform:translateY(0);}
+  .picker-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px;}
+  .picker-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+  .picker-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s;}
+  .picker-item:hover{border-color:var(--accent);}
+  .picker-item.used{opacity:.3;pointer-events:none;}
+  .pi-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+  .pi-name{font-family:var(--mono);font-size:12px;font-weight:500;}
+  .pi-loc{font-family:var(--mono);font-size:10px;color:var(--muted);}
+  .picker-cancel{width:100%;padding:11px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-family:var(--mono);font-size:12px;cursor:pointer;transition:border-color .15s,color .15s;}
+  .picker-cancel:hover{border-color:var(--border);color:var(--text);}
+
+  .mode-footer{display:flex;align-items:center;justify-content:space-between;}
+  .mf-info{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .mf-info span{color:var(--accent);}
+
+  /* ═══ S4 MONITOR ═══ */
+  #s-mon{flex-direction:column;}
+  .mon-body{padding:54px 0 0;width:100%;height:100%;display:flex;}
+  .mon-main{flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;}
+  .mon-feed{flex:1;background:#000;border:1px solid var(--border);border-radius:14px;position:relative;overflow:hidden;}
+  .mf-noise{position:absolute;inset:0;opacity:.2;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");pointer-events:none;}
+  .mf-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+  .det-box{width:160px;height:120px;border:1.5px solid var(--accent);border-radius:4px;position:relative;animation:floatD 5s ease-in-out infinite;}
+  @keyframes floatD{0%,100%{transform:translate(-18px,-8px)}50%{transform:translate(18px,8px)}}
+  .det-box::before,.det-box::after{content:'';position:absolute;width:10px;height:10px;border-color:var(--accent);border-style:solid;}
+  .det-box::before{top:-2px;left:-2px;border-width:2px 0 0 2px;}
+  .det-box::after{bottom:-2px;right:-2px;border-width:0 2px 2px 0;}
+  .det-lbl{position:absolute;top:-26px;left:0;font-family:var(--mono);font-size:10px;color:var(--accent);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.2);padding:2px 8px;border-radius:4px;white-space:nowrap;}
+  .det-bar{position:absolute;bottom:-15px;left:0;right:0;height:3px;background:rgba(0,229,160,.15);border-radius:2px;}
+  .det-fill{height:100%;width:87%;background:var(--accent);border-radius:2px;}
+  /* video playback mode - show video element instead of detection box */
+  .vid-player{position:absolute;inset:0;display:none;flex-direction:column;}
+  .vid-player video{width:100%;height:100%;object-fit:contain;background:#000;}
+  .vid-player.show{display:flex;}
+  .mf-ov.hide-for-video{display:none;}
+  .hud-tl{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:5px;z-index:2;}
+  .hp{font-family:var(--mono);font-size:10px;background:rgba(0,0,0,.75);padding:3px 10px;border-radius:5px;display:flex;align-items:center;gap:6px;}
+  .hp.live{color:var(--red);border:1px solid rgba(255,71,87,.3);}
+  .hp.info{color:var(--muted2);border:1px solid var(--border);}
+  .hp.ai{color:var(--accent);border:1px solid rgba(0,229,160,.2);}
+  .hud-br{position:absolute;bottom:12px;right:12px;font-family:var(--mono);font-size:10px;color:var(--muted);background:rgba(0,0,0,.65);padding:3px 10px;border-radius:5px;z-index:2;}
+  .mon-thumbs{display:flex;gap:8px;height:76px;}
+  .thumb{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .18s;}
+  .thumb:hover{border-color:var(--border2);}
+  .thumb.cur{border-color:var(--accent);}
+  .thumb svg{width:15px;height:15px;color:var(--muted);opacity:.22;}
+  .thumb-lbl{position:absolute;bottom:5px;left:6px;font-family:var(--mono);font-size:9px;color:var(--muted);}
+  .thumb.cur .thumb-lbl{color:var(--accent);}
+  .mon-sidebar{width:254px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
+  .sb-h{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;}
+  .alert-card{background:var(--bg3);border:1px solid rgba(255,71,87,.22);border-radius:10px;padding:10px 12px;}
+  .ar{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
+  .adot{width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;animation:pulse 1.5s infinite;}
+  .atitle{font-family:var(--mono);font-size:11px;color:var(--red);font-weight:500;}
+  .atime{font-family:var(--mono);font-size:10px;color:var(--muted);}
+  .asub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;}
+  .graph-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .gr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .gl{font-family:var(--mono);font-size:10px;color:var(--muted2);}
+  .gv{font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:500;}
+  .stats-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .stat-b{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+  .sv{font-family:var(--mono);font-size:20px;font-weight:500;}
+  .sl{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.07em;}
+  .sb-btns{display:flex;flex-direction:column;gap:8px;margin-top:auto;}
+  .btn-stop{padding:12px;background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.28);border-radius:10px;color:var(--red);font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s;}
+  .btn-stop:hover{background:rgba(255,71,87,.18);}
+  .btn-ghost{padding:11px;background:transparent;border:1px solid var(--border2);border-radius:10px;color:var(--muted2);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:border-color .2s,color .2s;}
+  .btn-ghost:hover{border-color:var(--border);color:var(--text);}
+</style>
+</head>
+<body>
+
+<!-- S1: LOGIN -->
+<div class="screen active" id="s-login">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke="#07080a" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M2 12h2M20 12h2M12 2v2M12 20v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M17 7l1.4-1.4M5.6 18.4l1.4-1.4"/></svg></div>
+      <div><div class="ln">VisionAI</div><div class="ls">Monitoring System</div></div>
+    </div>
+    <div class="lh">Sign In</div>
+    <div class="lhint">// Authorized personnel only</div>
+    <div class="fwrap"><div class="flbl">User ID</div><input class="fi" type="text" value="admin@visionai" placeholder="admin@visionai"></div>
+    <div class="fwrap"><div class="flbl">Password</div><input class="fi" type="password" value="password" placeholder="••••••••"></div>
+    <button class="btn" style="width:100%;margin-top:6px" onclick="goTo('s-dash')">Authenticate →</button>
+    <div class="lbadge">⬡ ENCRYPTED · TLS 1.3 · AES-256</div>
+  </div>
+</div>
+
+<!-- S2: DASHBOARD -->
+<div class="screen" id="s-dash">
+  <div class="bar">
+    <div class="logo">VisionAI</div><div class="sep"></div>
+    <div class="bar-title">Dashboard — Campus Overview</div>
+    <div class="bar-right"><div class="live-dot"></div><div class="live-txt">System Online</div><div class="sep"></div><div class="clock" id="c1">--:--:--</div></div>
+  </div>
+  <div class="dash-body">
+    <div>
+      <div class="sec-t">// Campus A — classrooms · click any room to monitor</div>
+      <div class="rooms-wrap">
+        <div class="rooms-grid" id="roomGrid"></div>
+      </div>
+    </div>
+    <div class="dash-stats">
+      <div class="sc"><div class="sc-v" style="color:var(--accent)" id="activeRooms">0</div><div class="sc-l">Active<br>classes</div></div>
+      <div class="sc"><div class="sc-v">24</div><div class="sc-l">Total<br>rooms</div></div>
+      <div class="sc"><div class="sc-v" style="color:var(--amber)">2</div><div class="sc-l">AI alerts<br>today</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- S3: MODE SELECTION -->
+<div class="screen" id="s-mode">
+  <div class="bar">
+    <div class="bc done" onclick="goTo('s-dash')">Dashboard</div><div class="bc-arr">›</div>
+    <div class="bc active">Mode</div>
+    <div class="sep" style="margin-left:4px"></div>
+    <div class="selected-room-pill" id="roomPill">Room —</div>
+    <div class="bar-right"><div class="clock" id="c2">--:--:--</div></div>
+  </div>
+  <div class="mode-body">
+    <div>
+      <div class="sec-t">// Select monitoring mode</div>
+      <div class="mode-row">
+        <div class="mode-card sel" id="mc-rt" onclick="selMode('realtime')">
+          <div class="mi-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div>
+          <div class="mi-info"><div class="mi-name">Real-time</div><div class="mi-desc">Live stream · AI detection</div></div>
+          <div class="mi-radio"><div class="mi-dot"></div></div>
+        </div>
+        <div class="mode-card" id="mc-vid" onclick="selMode('video')">
+          <div class="mi-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 9l5-3v12l-5-3V9z"/></svg></div>
+          <div class="mi-info"><div class="mi-name">Video</div><div class="mi-desc">Upload &amp; analyse recorded footage</div></div>
+          <div class="mi-radio"><div class="mi-dot"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REAL-TIME camera panel -->
+    <div class="rt-panel show" id="rtPanel">
+      <div class="rt-panel-top">
+        <div class="rt-panel-title">// Camera feeds — click + to add</div>
+        <div class="rt-count" id="rtCount">2 cameras</div>
+      </div>
+      <div class="rt-slots" id="rtSlots"></div>
+    </div>
+
+    <!-- VIDEO upload panel -->
+    <div class="upload-panel" id="uploadPanel">
+      <div class="sec-t" style="margin-bottom:0">// Upload video file</div>
+      <div class="upload-area" id="uploadArea">
+        <input type="file" accept="video/*" id="vidFile" onchange="onFileSelect(this)">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        </div>
+        <div class="upload-title">Drop video here or click to browse</div>
+        <div class="upload-sub">MP4, MOV, AVI, MKV · max 2 GB</div>
+        <div class="upload-filename" id="uploadFilename">file.mp4</div>
+      </div>
+      <div class="upload-meta">
+        <div class="upload-chip" id="uploadChipType">Format: —</div>
+        <div class="upload-chip" id="uploadChipSize">Size: —</div>
+        <div class="upload-chip" id="uploadChipDur">Duration: —</div>
+      </div>
+    </div>
+
+    <div class="mode-footer">
+      <div class="mf-info">Room: <span id="modeTxt">—</span></div>
+      <button class="btn" id="startBtn" onclick="startMonitor()">Start Monitoring →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Camera picker overlay -->
+<div class="overlay" id="pickerOv" onclick="handleOvClick(event)">
+  <div class="picker-modal">
+    <div class="picker-title">// Add a camera</div>
+    <div class="picker-list" id="pickerList"></div>
+    <button class="picker-cancel" onclick="closePicker()">Cancel</button>
+  </div>
+</div>
+
+<!-- S4: MONITOR -->
+<div class="screen" id="s-mon">
+  <div class="bar">
+    <div class="logo">VisionAI</div><div class="sep"></div>
+    <div class="bar-title" id="monTitle">Live Monitor</div>
+    <div class="bar-right"><div class="live-dot"></div><div class="live-txt" id="monStatus">Recording</div><div class="sep"></div><div class="clock" id="c3">--:--:--</div></div>
+  </div>
+  <div class="mon-body">
+    <div class="mon-main">
+      <div class="mon-feed">
+        <div class="mf-noise"></div>
+        <!-- AI detection overlay (realtime mode) -->
+        <div class="mf-ov" id="detOv">
+          <div class="det-box"><div class="det-lbl">Person · 87% confidence</div><div class="det-bar"><div class="det-fill"></div></div></div>
+        </div>
+        <!-- Video player (video mode) -->
+        <div class="vid-player" id="vidPlayer">
+          <video id="videoEl" controls></video>
+        </div>
+        <div class="hud-tl" id="hudTl">
+          <div class="hp live"><div style="width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;flex-shrink:0"></div><span id="hudMode">LIVE REC</span></div>
+          <div class="hp info" id="hudCam">FRONT CAM · ENTRY</div>
+          <div class="hp ai" id="hudAi">⬡ AI DETECTION ON</div>
+        </div>
+        <div class="hud-br" id="recT">REC 00:00:00</div>
+      </div>
+      <div class="mon-thumbs" id="monThumbs"></div>
+    </div>
+    <div class="mon-sidebar">
+      <div><div class="sb-h">// AI Alerts</div>
+        <div class="alert-card"><div class="ar"><div class="adot"></div><div class="atitle">Motion Detected</div></div><div class="atime" id="atime">Just now</div><div class="asub">Zone A · Front entry · Conf 87%</div></div>
+      </div>
+      <div><div class="sb-h">// Activity Trend</div>
+        <div class="graph-card">
+          <div class="gr"><div class="gl">Events / min</div><div class="gv" id="gval">3</div></div>
+          <svg width="100%" height="54" viewBox="0 0 226 54">
+            <defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00e5a0" stop-opacity=".2"/><stop offset="100%" stop-color="#00e5a0" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0 46 L19 40 L38 36 L57 38 L76 24 L95 16 L114 26 L133 8 L152 20 L171 14 L190 32 L209 24 L226 28 L226 54 L0 54Z" fill="url(#gf)"/>
+            <path d="M0 46 L19 40 L38 36 L57 38 L76 24 L95 16 L114 26 L133 8 L152 20 L171 14 L190 32 L209 24 L226 28" fill="none" stroke="#00e5a0" stroke-width="1.5"/>
+            <circle cx="133" cy="8" r="3" fill="#00e5a0"/>
+          </svg>
+        </div>
+      </div>
+      <div><div class="sb-h">// Session Stats</div>
+        <div class="stats-g">
+          <div class="stat-b"><div class="sv" id="sDet">12</div><div class="sl">Detections</div></div>
+          <div class="stat-b"><div class="sv" id="sDur">00:00</div><div class="sl">Duration</div></div>
+          <div class="stat-b"><div class="sv" style="color:var(--accent)" id="sCams">2</div><div class="sl">Cameras</div></div>
+          <div class="stat-b"><div class="sv" style="color:var(--amber)">2</div><div class="sl">Alerts</div></div>
+        </div>
+      </div>
+      <div class="sb-btns">
+        <button class="btn-stop" onclick="stopSession()"><svg width="11" height="11" viewBox="0 0 24 24" fill="var(--red)"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Stop Session</button>
+        <button class="btn-ghost"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── NAV
+function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+// ─── CLOCKS
+function tick(){ const t=new Date().toLocaleTimeString('en-GB'); ['c1','c2','c3'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=t;}); }
+setInterval(tick,1000); tick();
+
+// ─── ROOMS (S2)
+const rooms=[
+  {id:'R-101',name:'Class 101',on:true},{id:'R-102',name:'Class 102',on:true},{id:'R-103',name:'Class 103',on:false},
+  {id:'R-104',name:'Class 104',on:true},{id:'R-105',name:'Class 105',on:true},{id:'R-106',name:'Class 106',on:false},
+  {id:'R-201',name:'Class 201',on:true},{id:'R-202',name:'Class 202',on:false},{id:'R-203',name:'Class 203',on:true},
+  {id:'R-204',name:'Class 204',on:true},{id:'R-205',name:'Class 205',on:true},{id:'R-206',name:'Class 206',on:false},
+  {id:'R-301',name:'Lab 301',on:false},{id:'R-302',name:'Lab 302',on:true},{id:'R-303',name:'Class 303',on:true},
+  {id:'R-304',name:'Class 304',on:false},{id:'R-305',name:'Class 305',on:true},{id:'R-306',name:'Class 306',on:true},
+  {id:'R-401',name:'Class 401',on:true},{id:'R-402',name:'Class 402',on:false},{id:'R-403',name:'Class 403',on:true},
+  {id:'R-404',name:'Class 404',on:true},{id:'R-405',name:'Class 405',on:false},{id:'R-406',name:'Class 406',on:true},
+];
+let selectedRoom='';
+const rg=document.getElementById('roomGrid'); let ac=0;
+rooms.forEach(r=>{
+  const el=document.createElement('div');
+  el.className='room-box'+(r.on?' on':'');
+  el.innerHTML=`<div class="rb-id">${r.id}</div><div class="rb-name">${r.name}</div><div class="rb-dot"></div>`;
+  el.onclick=()=>{ selectedRoom=r.name; document.getElementById('roomPill').textContent=r.name; document.getElementById('modeTxt').textContent=r.name; goTo('s-mode'); };
+  if(r.on)ac++; rg.appendChild(el);
+});
+document.getElementById('activeRooms').textContent=ac;
+
+// ─── CAMERAS (only front + back)
+const cams=[
+  {id:'CAM-F',name:'Front Camera',loc:'Main entrance · Wide angle',status:'online'},
+  {id:'CAM-B',name:'Back Camera',loc:'Rear entrance · Fixed',status:'online'},
+];
+let rtCams=['CAM-F','CAM-B'];
+
+// ─── MODE SELECTION
+let currentMode='realtime';
+function selMode(m){
+  currentMode=m;
+  document.getElementById('mc-rt').classList.toggle('sel',m==='realtime');
+  document.getElementById('mc-vid').classList.toggle('sel',m==='video');
+  document.getElementById('rtPanel').classList.toggle('show',m==='realtime');
+  document.getElementById('uploadPanel').classList.toggle('show',m==='video');
+  if(m==='realtime') renderSlots();
+}
+
+// ─── RT SLOTS
+function renderSlots(){
+  const c=document.getElementById('rtSlots'); c.innerHTML='';
+  rtCams.forEach((id,i)=>{
+    const cam=cams.find(c=>c.id===id);
+    const el=document.createElement('div'); el.className='cam-slot';
+    el.innerHTML=`<div class="cs-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg><div class="cs-live"><div class="cs-live-dot"></div>LIVE</div></div><div class="cs-info"><div class="cs-name">${cam?cam.name:id}</div><div class="cs-loc">${cam?cam.loc:''}</div></div>${rtCams.length>1?`<div class="cs-remove" onclick="removeSlot(${i})">✕</div>`:''}`;
+    c.appendChild(el);
+  });
+  // + add slot (only if there are more cameras to add)
+  const remaining=cams.filter(c=>!rtCams.includes(c.id));
+  if(remaining.length>0){
+    const add=document.createElement('div'); add.className='cam-add';
+    add.innerHTML=`<div class="cam-add-icon">+</div><span>Add camera</span>`;
+    add.onclick=openPicker; c.appendChild(add);
+  }
+  document.getElementById('rtCount').textContent=rtCams.length+' camera'+(rtCams.length!==1?'s':'');
+}
+renderSlots();
+
+function removeSlot(i){ if(rtCams.length<=1)return; rtCams.splice(i,1); renderSlots(); }
+
+function openPicker(){
+  const ov=document.getElementById('pickerOv'), pl=document.getElementById('pickerList');
+  pl.innerHTML='';
+  cams.forEach(cam=>{
+    const used=rtCams.includes(cam.id);
+    const el=document.createElement('div'); el.className='picker-item'+(used?' used':'');
+    el.innerHTML=`<div class="pi-dot"></div><div><div class="pi-name">${cam.name}</div><div class="pi-loc">${cam.loc}</div></div>`;
+    el.onclick=()=>{if(!used){rtCams.push(cam.id);renderSlots();closePicker();}};
+    pl.appendChild(el);
+  });
+  ov.classList.add('open');
+}
+function closePicker(){ document.getElementById('pickerOv').classList.remove('open'); }
+function handleOvClick(e){ if(e.target===e.currentTarget)closePicker(); }
+
+// ─── VIDEO UPLOAD
+let uploadedFile=null, uploadedURL=null;
+function onFileSelect(input){
+  const f=input.files[0]; if(!f)return;
+  uploadedFile=f;
+  if(uploadedURL) URL.revokeObjectURL(uploadedURL);
+  uploadedURL=URL.createObjectURL(f);
+  const area=document.getElementById('uploadArea');
+  area.classList.add('has-file');
+  document.getElementById('uploadFilename').textContent=f.name;
+  document.getElementById('uploadChipType').textContent='Format: '+f.name.split('.').pop().toUpperCase();
+  document.getElementById('uploadChipSize').textContent='Size: '+(f.size>1e6?(f.size/1e6).toFixed(1)+' MB':(f.size/1e3).toFixed(0)+' KB');
+  // get duration
+  const tmpVid=document.createElement('video');
+  tmpVid.src=uploadedURL;
+  tmpVid.onloadedmetadata=()=>{ const d=Math.round(tmpVid.duration); document.getElementById('uploadChipDur').textContent='Duration: '+(d>=60?Math.floor(d/60)+'m '+d%60+'s':d+'s'); };
+}
+
+// ─── START MONITOR
+function startMonitor(){
+  if(currentMode==='video'){
+    // setup video player
+    document.getElementById('detOv').style.display='none';
+    const vp=document.getElementById('vidPlayer'); vp.classList.add('show');
+    const ve=document.getElementById('videoEl');
+    if(uploadedURL){ ve.src=uploadedURL; ve.play(); }
+    document.getElementById('hudMode').textContent='VIDEO ANALYSIS';
+    document.getElementById('hudCam').textContent=uploadedFile?uploadedFile.name:'Uploaded file';
+    document.getElementById('hudAi').textContent='⬡ AI SCANNING';
+    document.getElementById('monTitle').textContent='Video Monitor — '+selectedRoom;
+    document.getElementById('monStatus').textContent='Analysing';
+    // thumbs
+    const th=document.getElementById('monThumbs'); th.innerHTML='';
+    const t=document.createElement('div'); t.className='thumb cur';
+    t.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 9l5-3v12l-5-3V9z"/></svg><div class="thumb-lbl">Uploaded</div>`;
+    th.appendChild(t);
+    document.getElementById('sCams').textContent='1';
+  } else {
+    // realtime
+    document.getElementById('detOv').style.display='';
+    document.getElementById('vidPlayer').classList.remove('show');
+    document.getElementById('hudMode').textContent='LIVE REC';
+    document.getElementById('hudAi').textContent='⬡ AI DETECTION ON';
+    document.getElementById('monTitle').textContent='Live Monitor — '+selectedRoom;
+    document.getElementById('monStatus').textContent='Recording';
+    // build thumbs from rtCams
+    const th=document.getElementById('monThumbs'); th.innerHTML='';
+    rtCams.forEach((id,i)=>{
+      const cam=cams.find(c=>c.id===id);
+      const t=document.createElement('div'); t.className='thumb'+(i===0?' cur':'');
+      t.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg><div class="thumb-lbl">${cam?cam.name.split(' ')[0]:id}</div>`;
+      th.appendChild(t);
+    });
+    document.getElementById('hudCam').textContent=(cams.find(c=>c.id===rtCams[0])||{name:'CAM'}).name.toUpperCase();
+    document.getElementById('sCams').textContent=rtCams.length;
+  }
+  goTo('s-mon');
+  startTimer();
+}
+
+// ─── MONITOR TIMER
+let monSec=0, monInt=null, monDet=12;
+function startTimer(){
+  if(monInt)clearInterval(monInt); monSec=0;
+  monInt=setInterval(()=>{
+    monSec++;
+    const m=String(Math.floor(monSec/60)).padStart(2,'0'), s=String(monSec%60).padStart(2,'0');
+    document.getElementById('recT').textContent=`REC 00:${m}:${s}`;
+    document.getElementById('sDur').textContent=`${m}:${s}`;
+    if(monSec%7===0){monDet++;document.getElementById('sDet').textContent=monDet;}
+    document.getElementById('atime').textContent=monSec<60?monSec+'s ago':Math.floor(monSec/60)+'m ago';
+    document.getElementById('gval').textContent=Math.floor(Math.random()*5)+1;
+  },1000);
+}
+function stopSession(){
+  clearInterval(monInt); monInt=null;
+  const ve=document.getElementById('videoEl'); ve.pause(); ve.src='';
+  goTo('s-dash');
+}
+</script>
+</body>
+</html>

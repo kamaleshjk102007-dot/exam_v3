@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExamGuard — Real-Time Exam Behavior Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #080b0f;
+    --surface:   #0d1117;
+    --card:      #111820;
+    --border:    #1e2d3d;
+    --red:       #ff2d2d;
+    --amber:     #ffaa00;
+    --cyan:      #00d4ff;
+    --green:     #00ff88;
+    --purple:    #9b59ff;
+    --text:      #c8d6e5;
+    --muted:     #526070;
+    --mono:      'Share Tech Mono', monospace;
+    --sans:      'Barlow', sans-serif;
+    --condensed: 'Barlow Condensed', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 400;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+    height: 64px;
+    background: rgba(8,11,15,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: var(--condensed);
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .nav-logo span { color: var(--red); }
+
+  .nav-links {
+    display: flex;
+    gap: 36px;
+    list-style: none;
+  }
+  .nav-links a {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--cyan); }
+
+  .nav-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 4px 12px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 120px 48px 80px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(255,45,45,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: glow-pulse 4s ease-in-out infinite;
+  }
+
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--red);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.2s forwards;
+  }
+
+  .hero-title {
+    font-family: var(--condensed);
+    font-size: clamp(56px, 8vw, 120px);
+    font-weight: 900;
+    line-height: 0.9;
+    text-transform: uppercase;
+    letter-spacing: -2px;
+    color: #fff;
+    margin-bottom: 12px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.4s forwards;
+  }
+  .hero-title .accent { color: var(--red); }
+
+  .hero-sub {
+    font-family: var(--condensed);
+    font-size: clamp(28px, 4vw, 52px);
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.5s forwards;
+  }
+
+  .hero-desc {
+    max-width: 600px;
+    font-size: 17px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--text);
+    margin-bottom: 48px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.6s forwards;
+  }
+
+  .hero-ctas {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.7s forwards;
+  }
+
+  .btn-primary {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 32px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  .btn-primary:hover {
+    background: #ff5555;
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 32px;
+    background: transparent;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover {
+    background: rgba(0,212,255,0.08);
+    transform: translateY(-2px);
+  }
+
+  /* ── TICKER ── */
+  .ticker {
+    position: relative;
+    background: var(--red);
+    padding: 10px 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .ticker-inner {
+    display: inline-flex;
+    animation: ticker 20s linear infinite;
+  }
+  .ticker-item {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    padding: 0 48px;
+  }
+  .ticker-item::before {
+    content: '▸ ';
+  }
+
+  /* ── SECTION BASE ── */
+  section {
+    padding: 100px 48px;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--red);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-label::before {
+    content: '';
+    width: 32px; height: 1px;
+    background: var(--red);
+  }
+
+  .section-title {
+    font-family: var(--condensed);
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -1px;
+    margin-bottom: 20px;
+  }
+
+  .section-desc {
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--muted);
+    line-height: 1.7;
+    max-width: 560px;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 0 48px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .stat-item {
+    padding: 40px 32px;
+    border-right: 1px solid var(--border);
+    opacity: 0;
+    animation: fadeUp 0.5s forwards;
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-item:nth-child(1) { animation-delay: 0.1s; }
+  .stat-item:nth-child(2) { animation-delay: 0.2s; }
+  .stat-item:nth-child(3) { animation-delay: 0.3s; }
+  .stat-item:nth-child(4) { animation-delay: 0.4s; }
+
+  .stat-num {
+    font-family: var(--condensed);
+    font-size: 52px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-num .unit {
+    font-size: 24px;
+    color: var(--red);
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── FEATURES ── */
+  .features {
+    background: var(--bg);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .features-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 64px;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  .feature-card {
+    background: var(--card);
+    padding: 40px 36px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s;
+  }
+  .feature-card:hover { background: #141e28; }
+
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, var(--cyan));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s;
+  }
+  .feature-card:hover::before { transform: scaleX(1); }
+
+  .feature-icon {
+    font-size: 28px;
+    margin-bottom: 20px;
+    display: block;
+  }
+
+  .feature-title {
+    font-family: var(--condensed);
+    font-size: 22px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  .feature-desc {
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .feature-tag {
+    margin-top: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent, var(--cyan));
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── CLASSES ── */
+  .classes-section {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .classes-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .classes-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+    margin-top: 56px;
+  }
+
+  .class-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 24px 16px;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .class-card:hover {
+    border-color: var(--class-color, var(--cyan));
+    transform: translateY(-4px);
+  }
+  .class-card.ignored {
+    opacity: 0.35;
+  }
+  .class-card.ignored::after {
+    content: 'IGNORED';
+    position: absolute;
+    top: 8px; right: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .class-card.alert::after {
+    content: 'ALERT';
+    position: absolute;
+    top: 8px; right: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--red);
+    letter-spacing: 1px;
+  }
+
+  .class-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--class-color, var(--muted));
+    margin: 0 auto 14px;
+  }
+
+  .class-name {
+    font-family: var(--condensed);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    letter-spacing: 0.5px;
+    line-height: 1.3;
+  }
+
+  .class-conf {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .how-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 64px;
+    position: relative;
+  }
+
+  .steps::before {
+    content: '';
+    position: absolute;
+    top: 28px; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), var(--border), transparent);
+  }
+
+  .step {
+    padding: 0 32px;
+    text-align: center;
+    position: relative;
+  }
+
+  .step-num {
+    width: 56px; height: 56px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    font-family: var(--mono);
+    font-size: 16px;
+    color: var(--cyan);
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s;
+  }
+  .step:hover .step-num {
+    border-color: var(--cyan);
+    background: rgba(0,212,255,0.08);
+    box-shadow: 0 0 20px rgba(0,212,255,0.2);
+  }
+
+  .step-title {
+    font-family: var(--condensed);
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  .step-desc {
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ── TERMINAL ── */
+  .terminal-section {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .terminal-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items: center;
+  }
+
+  .terminal {
+    background: #060a0e;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: var(--mono);
+  }
+
+  .terminal-bar {
+    background: #0d1117;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .t-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .t-dot.red   { background: #ff5f57; }
+  .t-dot.amber { background: #febc2e; }
+  .t-dot.green { background: #28c840; }
+
+  .terminal-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 8px;
+    letter-spacing: 1px;
+  }
+
+  .terminal-body {
+    padding: 24px;
+    font-size: 13px;
+    line-height: 2;
+  }
+
+  .t-comment { color: #3d5468; }
+  .t-prompt  { color: var(--muted); }
+  .t-cmd     { color: var(--cyan); }
+  .t-flag    { color: var(--amber); }
+  .t-val     { color: var(--green); }
+  .t-output  { color: var(--text); }
+  .t-alarm   { color: var(--red); }
+  .t-shot    { color: var(--amber); }
+  .t-cursor  {
+    display: inline-block;
+    width: 8px; height: 14px;
+    background: var(--cyan);
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+
+  /* ── CONFIG ── */
+  .config-section { max-width: 1400px; margin: 0 auto; }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-top: 56px;
+  }
+
+  .config-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 32px;
+  }
+
+  .config-card-title {
+    font-family: var(--condensed);
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .config-card-title span {
+    font-size: 13px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .config-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(30,45,61,0.5);
+    font-size: 13px;
+  }
+  .config-row:last-child { border-bottom: none; }
+
+  .config-key {
+    font-family: var(--mono);
+    color: var(--cyan);
+    font-size: 12px;
+  }
+
+  .config-val {
+    font-family: var(--mono);
+    color: var(--amber);
+    font-size: 12px;
+  }
+
+  .config-note {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 300;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+
+  .footer-logo {
+    font-family: var(--condensed);
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .footer-logo span { color: var(--red); }
+
+  .footer-info {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .footer-stack {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .stack-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    letter-spacing: 1px;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    50%       { opacity: 0.6; transform: translate(-50%,-50%) scale(1.1); }
+  }
+
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(32px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1100px) {
+    .features-grid  { grid-template-columns: repeat(2, 1fr); }
+    .classes-grid   { grid-template-columns: repeat(4, 1fr); }
+    .steps          { grid-template-columns: repeat(2, 1fr); gap: 48px; }
+    .steps::before  { display: none; }
+    .terminal-inner { grid-template-columns: 1fr; }
+    .stats-bar      { grid-template-columns: repeat(2, 1fr); }
+    .stat-item:nth-child(2) { border-right: none; }
+  }
+
+  @media (max-width: 768px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    section { padding: 72px 24px; }
+    .hero { padding: 100px 24px 60px; }
+    .features-grid  { grid-template-columns: 1fr; }
+    .classes-grid   { grid-template-columns: repeat(2, 1fr); }
+    .steps          { grid-template-columns: 1fr; }
+    .config-grid    { grid-template-columns: 1fr; }
+    .stats-bar      { grid-template-columns: 1fr; padding: 0 24px; }
+    .stat-item      { border-right: none; border-bottom: 1px solid var(--border); }
+    footer          { padding: 32px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Exam<span>Guard</span></div>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#classes">Classes</a></li>
+    <li><a href="#howitworks">How It Works</a></li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#config">Config</a></li>
+  </ul>
+  <div class="nav-badge">System Active</div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-tag">YOLOv8 · Real-Time Detection · v3.0</div>
+  <h1 class="hero-title">EXAM<br><span class="accent">GUARD</span></h1>
+  <div class="hero-sub">Behavior Detection System</div>
+  <p class="hero-desc">
+    Real-time exam malpractice detection using YOLOv8. Monitors 7 behavior classes,
+    triggers instant alarms, saves violation screenshots, and displays a live HUD — all on standard CCTV footage.
+  </p>
+  <div class="hero-ctas">
+    <a href="#usage" class="btn-primary">Quick Start</a>
+    <a href="#features" class="btn-secondary">Learn More</a>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span class="ticker-item">Phone Detection</span>
+    <span class="ticker-item">Hand Under Table</span>
+    <span class="ticker-item">Look Around</span>
+    <span class="ticker-item">Wave Detection</span>
+    <span class="ticker-item">Bend Over Desk</span>
+    <span class="ticker-item">Auto Screenshot</span>
+    <span class="ticker-item">Audio Alarm</span>
+    <span class="ticker-item">Live HUD Overlay</span>
+    <span class="ticker-item">Real-Time FPS Monitor</span>
+    <span class="ticker-item">CCTV Compatible</span>
+    <span class="ticker-item">Phone Detection</span>
+    <span class="ticker-item">Hand Under Table</span>
+    <span class="ticker-item">Look Around</span>
+    <span class="ticker-item">Wave Detection</span>
+    <span class="ticker-item">Bend Over Desk</span>
+    <span class="ticker-item">Auto Screenshot</span>
+    <span class="ticker-item">Audio Alarm</span>
+    <span class="ticker-item">Live HUD Overlay</span>
+    <span class="ticker-item">Real-Time FPS Monitor</span>
+    <span class="ticker-item">CCTV Compatible</span>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num">7<span class="unit"> cls</span></div>
+    <div class="stat-label">Behavior Classes</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">30<span class="unit"> fps</span></div>
+    <div class="stat-label">Real-Time Processing</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">5<span class="unit"> sec</span></div>
+    <div class="stat-label">Alarm Cooldown</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">0<span class="unit"> dep</span></div>
+    <div class="stat-label">Extra Infrastructure</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features" style="background:var(--bg); padding-top:100px; padding-bottom:100px;">
+  <div class="features" style="max-width:1400px; margin:0 auto;">
+    <div class="features-header reveal">
+      <div>
+        <div class="section-label">Capabilities</div>
+        <h2 class="section-title">Built For<br>Real Exams</h2>
+      </div>
+      <p class="section-desc">
+        Every component is designed for exam hall conditions — crowded frames, low lighting, wide-angle CCTV, and long monitoring sessions.
+      </p>
+    </div>
+    <div class="features-grid reveal">
+      <div class="feature-card" style="--accent: var(--red);">
+        <span class="feature-icon">🎯</span>
+        <div class="feature-title">Per-Class Confidence</div>
+        <p class="feature-desc">Each behavior class has its own confidence threshold tuned to its detection difficulty. Phone requires 0.70, subtle glances only 0.45.</p>
+        <div class="feature-tag">Precision Tuning</div>
+      </div>
+      <div class="feature-card" style="--accent: var(--amber);">
+        <span class="feature-icon">📸</span>
+        <div class="feature-title">Auto Screenshots</div>
+        <p class="feature-desc">Violation frames are automatically saved with timestamp and class name. Independent cooldown timer prevents screenshot flooding.</p>
+        <div class="feature-tag">Evidence Capture</div>
+      </div>
+      <div class="feature-card" style="--accent: var(--green);">
+        <span class="feature-icon">🔔</span>
+        <div class="feature-title">Audio Alarm</div>
+        <p class="feature-desc">880Hz stereo beep fires on sustained violations. Runs on a daemon thread so it never blocks the detection loop or drops frames.</p>
+        <div class="feature-tag">Non-Blocking</div>
+      </div>
+      <div class="feature-card" style="--accent: var(--cyan);">
+        <span class="feature-icon">📊</span>
+        <div class="feature-title">Live HUD Overlay</div>
+        <p class="feature-desc">Semi-transparent overlay shows real-time FPS, violation counter, timestamp, and cumulative detection counts per class.</p>
+        <div class="feature-tag">Operator View</div>
+      </div>
+      <div class="feature-card" style="--accent: var(--purple);">
+        <span class="feature-icon">🚫</span>
+        <div class="feature-title">Class Ignore System</div>
+        <p class="feature-desc">Any class can be fully disabled with one line — no box, no alarm, no count. Stand Up and Normal ignored by default to eliminate false positives.</p>
+        <div class="feature-tag">Zero False Positives</div>
+      </div>
+      <div class="feature-card" style="--accent: var(--red);">
+        <span class="feature-icon">🔲</span>
+        <div class="feature-title">Box Size Filtering</div>
+        <p class="feature-desc">Min and max area ratios reject tiny background noise and oversized false detections. Phone also gets an aspect-ratio check for portrait orientation.</p>
+        <div class="feature-tag">Geometry Validation</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLASSES -->
+<section id="classes" class="classes-section">
+  <div class="classes-inner">
+    <div class="reveal">
+      <div class="section-label">Detection Classes</div>
+      <h2 class="section-title">What Gets<br>Detected</h2>
+    </div>
+    <div class="classes-grid reveal">
+      <div class="class-card alert" style="--class-color: #ff2d2d;">
+        <div class="class-dot" style="background:#ff2d2d;"></div>
+        <div class="class-name">Phone</div>
+        <div class="class-conf">conf ≥ 0.70</div>
+      </div>
+      <div class="class-card alert" style="--class-color: #00d4ff;">
+        <div class="class-dot" style="background:#00d4ff;"></div>
+        <div class="class-name">Hand Under Table</div>
+        <div class="class-conf">conf ≥ 0.55</div>
+      </div>
+      <div class="class-card alert" style="--class-color: #ffff00;">
+        <div class="class-dot" style="background:#ffff00;"></div>
+        <div class="class-name">Look Around</div>
+        <div class="class-conf">conf ≥ 0.45</div>
+      </div>
+      <div class="class-card alert" style="--class-color: #9b59ff;">
+        <div class="class-dot" style="background:#9b59ff;"></div>
+        <div class="class-name">Wave</div>
+        <div class="class-conf">conf ≥ 0.60</div>
+      </div>
+      <div class="class-card" style="--class-color: #ff9500;">
+        <div class="class-dot" style="background:#ff9500;"></div>
+        <div class="class-name">Bend Over Desk</div>
+        <div class="class-conf">conf ≥ 0.40</div>
+      </div>
+      <div class="class-card ignored">
+        <div class="class-dot"></div>
+        <div class="class-name">Normal</div>
+        <div class="class-conf">disabled</div>
+      </div>
+      <div class="class-card ignored">
+        <div class="class-dot"></div>
+        <div class="class-name">Stand Up</div>
+        <div class="class-conf">disabled</div>
+      </div>
+    </div>
+    <div style="margin-top:24px; display:flex; gap:24px; flex-wrap:wrap;" class="reveal">
+      <div style="display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px; color:var(--red);">
+        <div style="width:8px;height:8px;background:var(--red);border-radius:50%;"></div> ALERT — triggers alarm + screenshot
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px; color:var(--muted);">
+        <div style="width:8px;height:8px;background:var(--muted);border-radius:50%;"></div> IGNORED — fully disabled
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="howitworks">
+  <div class="how-inner">
+    <div class="reveal">
+      <div class="section-label">Pipeline</div>
+      <h2 class="section-title">How It<br>Works</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal" style="transition-delay:0.1s">
+        <div class="step-num">01</div>
+        <div class="step-title">Frame Capture</div>
+        <p class="step-desc">Reads frames from webcam or video file. Rolling 30-frame buffer calculates real-time FPS with no stutter.</p>
+      </div>
+      <div class="step reveal" style="transition-delay:0.2s">
+        <div class="step-num">02</div>
+        <div class="step-title">YOLOv8 Inference</div>
+        <p class="step-desc">Each frame runs through YOLOv8 weights trained on 7 exam behavior classes. All ignored classes are skipped immediately.</p>
+      </div>
+      <div class="step reveal" style="transition-delay:0.3s">
+        <div class="step-num">03</div>
+        <div class="step-title">Filter & Validate</div>
+        <p class="step-desc">Detections pass through 5 filters: confidence threshold, degenerate box, min area, max area, and aspect ratio for phones.</p>
+      </div>
+      <div class="step reveal" style="transition-delay:0.4s">
+        <div class="step-num">04</div>
+        <div class="step-title">Alarm & Save</div>
+        <p class="step-desc">Alert classes trigger audio beep on daemon thread, red border flash, and auto-screenshot — all with independent cooldown timers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL / USAGE -->
+<section id="usage" class="terminal-section">
+  <div class="terminal-inner">
+    <div class="reveal">
+      <div class="section-label">Quick Start</div>
+      <h2 class="section-title">Up &amp; Running<br>In Seconds</h2>
+      <p class="section-desc" style="margin-bottom:32px;">
+        One command is all it takes. Point it at a video file or webcam and monitoring begins immediately.
+      </p>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:var(--mono); font-size:12px; color:var(--muted); letter-spacing:1px;">KEYBOARD CONTROLS</div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="background:var(--card); border:1px solid var(--border); padding:8px 16px; font-family:var(--mono); font-size:12px; color:var(--cyan);">S — Manual Screenshot</div>
+          <div style="background:var(--card); border:1px solid var(--border); padding:8px 16px; font-family:var(--mono); font-size:12px; color:var(--red);">Q / ESC — Quit</div>
+        </div>
+      </div>
+    </div>
+    <div class="terminal reveal" style="transition-delay:0.2s">
+      <div class="terminal-bar">
+        <div class="t-dot red"></div>
+        <div class="t-dot amber"></div>
+        <div class="t-dot green"></div>
+        <div class="terminal-title">PowerShell — exam_detector_v3.py</div>
+      </div>
+      <div class="terminal-body">
+        <div class="t-comment"># Install dependencies</div>
+        <div><span class="t-prompt">PS X:\&gt; </span><span class="t-cmd">pip install</span> <span class="t-val">ultralytics opencv-python pygame numpy</span></div>
+        <br>
+        <div class="t-comment"># Run on CCTV video file</div>
+        <div><span class="t-prompt">PS X:\&gt; </span><span class="t-cmd">python</span> exam_detector_v3.py <span class="t-flag">--source</span> <span class="t-val">cctv.mp4</span></div>
+        <br>
+        <div class="t-comment"># Run on webcam</div>
+        <div><span class="t-prompt">PS X:\&gt; </span><span class="t-cmd">python</span> exam_detector_v3.py <span class="t-flag">--source</span> <span class="t-val">0</span></div>
+        <br>
+        <div class="t-comment"># Custom model + override confidence</div>
+        <div><span class="t-prompt">PS X:\&gt; </span><span class="t-cmd">python</span> exam_detector_v3.py <span class="t-flag">--model</span> <span class="t-val">best.pt</span> <span class="t-flag">--conf</span> <span class="t-val">0.55</span></div>
+        <br>
+        <div class="t-output">  Model loaded — 7 classes</div>
+        <div class="t-alarm">  [ALARM] Hand Under Table</div>
+        <div class="t-shot">  [SCREENSHOT] exam_violations\violation_20260308_...jpg</div>
+        <div class="t-alarm">  [ALARM] phone</div>
+        <div class="t-shot">  [SCREENSHOT] exam_violations\violation_20260308_...jpg</div>
+        <div><span class="t-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONFIG -->
+<section id="config">
+  <div class="config-section">
+    <div class="reveal">
+      <div class="section-label">Configuration</div>
+      <h2 class="section-title">Tuning<br>Reference</h2>
+    </div>
+    <div class="config-grid reveal">
+      <div class="config-card">
+        <div class="config-card-title">Confidence Thresholds <span>CLASS_CONF</span></div>
+        <div class="config-row">
+          <span class="config-key">phone</span>
+          <span class="config-val">0.70</span>
+          <span class="config-note">Strictest — phone must be clear</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">Wave</span>
+          <span class="config-val">0.60</span>
+          <span class="config-note">High — arm movement clear</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">Hand Under Table</span>
+          <span class="config-val">0.55</span>
+          <span class="config-note">Medium — partially hidden</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">Look Around</span>
+          <span class="config-val">0.45</span>
+          <span class="config-note">Lower — subtle movement</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">Bend Over Desk</span>
+          <span class="config-val">0.40</span>
+          <span class="config-note">Lowest — posture detection</span>
+        </div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">Timing &amp; Cooldowns <span>seconds</span></div>
+        <div class="config-row">
+          <span class="config-key">ALARM_COOLDOWN</span>
+          <span class="config-val">5.0 s</span>
+          <span class="config-note">Min gap between audio alarms</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">SCREENSHOT_COOLDOWN</span>
+          <span class="config-val">5.0 s</span>
+          <span class="config-note">Min gap between auto-saves</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">FPS Buffer</span>
+          <span class="config-val">30 frames</span>
+          <span class="config-note">Rolling average window</span>
+        </div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">Disable a Class <span>IGNORED_CLASSES</span></div>
+        <div style="background:#060a0e; border:1px solid var(--border); padding:16px; font-family:var(--mono); font-size:12px; line-height:2; border-radius:2px;">
+          <span style="color:#3d5468;"># Add class name to disable it</span><br>
+          <span style="color:var(--cyan);">IGNORED_CLASSES</span>
+          <span style="color:var(--text);"> = {</span><br>
+          &nbsp;&nbsp;<span style="color:var(--amber);">"Stand Up"</span><span style="color:var(--text);">,</span><br>
+          &nbsp;&nbsp;<span style="color:var(--amber);">"Normal"</span><span style="color:var(--text);">,</span><br>
+          &nbsp;&nbsp;<span style="color:#3d5468;"># "Look Around",  ← add to disable</span><br>
+          <span style="color:var(--text);">}</span>
+        </div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">CLI Flags <span>--options</span></div>
+        <div class="config-row">
+          <span class="config-key">--source</span>
+          <span class="config-val">0 / file.mp4</span>
+          <span class="config-note">Webcam index or video path</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">--model</span>
+          <span class="config-val">best.pt</span>
+          <span class="config-note">YOLOv8 weights file path</span>
+        </div>
+        <div class="config-row">
+          <span class="config-key">--conf</span>
+          <span class="config-val">0.0 – 1.0</span>
+          <span class="config-note">Overrides all per-class thresholds</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Exam<span>Guard</span></div>
+  <div class="footer-info">
+    Built with YOLOv8 · OpenCV · pygame · numpy<br>
+    exam_detector_v3.py
+  </div>
+  <div class="footer-stack">
+    <div class="stack-tag">YOLOv8</div>
+    <div class="stack-tag">Python 3.10</div>
+    <div class="stack-tag">OpenCV</div>
+    <div class="stack-tag">pygame</div>
+    <div class="stack-tag">numpy</div>
+  </div>
+</footer>
+
+<script>
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Animated stat numbers
+  function animateNum(el, target, suffix='') {
+    let start = 0;
+    const dur = 1200;
+    const step = timestamp => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.floor(ease * target) + suffix;
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  const statsObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const nums = e.target.querySelectorAll('.stat-num');
+        const targets = [7, 30, 5, 0];
+        const units = [' cls', ' fps', ' sec', ' dep'];
+        nums.forEach((el, i) => {
+          const unit = el.querySelector('.unit');
+          const unitText = unit ? unit.outerHTML : '';
+          animateNum({ textContent: '' }, targets[i]);
+          let s = 0;
+          const dur = 1200;
+          const step = ts => {
+            if (!s) s = ts;
+            const p = Math.min((ts - s) / dur, 1);
+            const ease = 1 - Math.pow(1 - p, 3);
+            el.innerHTML = Math.floor(ease * targets[i]) + `<span class="unit">${units[i]}</span>`;
+            if (p < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        });
+        statsObs.disconnect();
+      }
+    });
+  }, { threshold: 0.5 });
+
+  const statsBar = document.querySelector('.stats-bar');
+  if (statsBar) statsObs.observe(statsBar);
+</script>
+</body>
+</html>
