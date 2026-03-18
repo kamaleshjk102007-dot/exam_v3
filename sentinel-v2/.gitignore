@@ -1,0 +1,8 @@
+*.pt
+*.mp4
+*.zip
+.env
+__pycache__/
+*.pyc
+uploads/
+snapshots/
