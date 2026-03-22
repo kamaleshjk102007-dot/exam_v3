@@ -1,10 +1,17 @@
 """
 SentinelEye — FastAPI Application Entry Point
 Run with: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+Routes:
+  /          → Landing page (exam_detector_web.html)
+  /app       → SentinelEye app (login / dashboard)
+  /api/...   → API endpoints
+  /api/docs  → Swagger UI
 """
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -77,19 +84,40 @@ app.mount("/static",    StaticFiles(directory="static"),    name="static")
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health():
-    from pathlib import Path
     model_ready = Path(settings.YOLO_MODEL).is_file()
+    landing_exists = Path("static/landing.html").is_file()
     return {
-        "status":      "ok",
-        "version":     "2.4.0",
-        "model":       settings.YOLO_MODEL,
-        "model_ready": model_ready,
-        "frame_skip":  settings.FRAME_SKIP,
-        "yolo_conf":   settings.YOLO_CONF,
+        "status":          "ok",
+        "version":         "2.4.0",
+        "model":           settings.YOLO_MODEL,
+        "model_ready":     model_ready,
+        "landing_page":    landing_exists,
+        "frame_skip":      settings.FRAME_SKIP,
+        "yolo_conf":       settings.YOLO_CONF,
     }
 
 
-# ── Serve frontend SPA (catch-all) ────────────────────────────────────────────
+# ── Landing page — public homepage ────────────────────────────────────────────
+@app.get("/", include_in_schema=False)
+async def serve_landing():
+    landing = Path("static/landing.html")
+    if landing.is_file():
+        return FileResponse("static/landing.html")
+    # Fallback to app if no landing page present
+    return FileResponse("static/index.html")
+
+
+# ── App page — SentinelEye dashboard (login required) ────────────────────────
+@app.get("/app", include_in_schema=False)
+async def serve_app():
+    return FileResponse("static/index.html")
+
+
+# ── Catch-all — everything else goes to the SPA ──────────────────────────────
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_frontend(full_path: str):
+    # Don't catch API routes accidentally
+    if full_path.startswith("api/"):
+        from fastapi import HTTPException
+        raise HTTPException(404, "Not found")
     return FileResponse("static/index.html")
