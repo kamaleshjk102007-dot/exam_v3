@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentinelEye — AI Exam Monitoring System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #04060a;
+    --surface:   #0a0e15;
+    --card:      #0e1520;
+    --border:    #1a2a3a;
+    --amber:     #f59e0b;
+    --cyan:      #00d4ff;
+    --green:     #00ff88;
+    --purple:    #8b5cf6;
+    --pink:      #ec4899;
+    --blue:      #3b82f6;
+    --text:      #c8d6e5;
+    --muted:     #4a5e72;
+    --mono:      'Share Tech Mono', monospace;
+    --sans:      'Barlow', sans-serif;
+    --condensed: 'Barlow Condensed', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-weight: 400; overflow-x: hidden; }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 48px; height: 64px;
+    background: rgba(4,6,10,0.88); backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(139,92,246,0.2);
+  }
+  .nav-logo { font-family: var(--condensed); font-size: 22px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; color: #fff; }
+  .nav-logo span {
+    background: linear-gradient(90deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .nav-links { display: flex; gap: 36px; list-style: none; }
+  .nav-links a { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; letter-spacing: 1px; text-transform: uppercase; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--cyan); }
+  .nav-right { display: flex; align-items: center; gap: 14px; }
+  .nav-badge {
+    font-family: var(--mono); font-size: 11px; color: var(--green);
+    border: 1px solid rgba(0,255,136,0.35); padding: 4px 12px; border-radius: 2px;
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,255,136,0.05);
+  }
+  .nav-badge::before { content: ''; width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse-dot 2s infinite; }
+
+  /* NAV LAUNCH BUTTON — animated gradient */
+  .nav-launch {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+    color: #fff; text-decoration: none; border-radius: 2px; font-weight: 700;
+    padding: 9px 24px; position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--purple), var(--blue), var(--cyan));
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .nav-launch::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, var(--cyan), var(--purple), var(--pink));
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite reverse;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .nav-launch:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(139,92,246,0.5); }
+  .nav-launch:hover::before { opacity: 1; }
+  .nav-launch span { position: relative; z-index: 1; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; padding: 120px 48px 80px; text-align: center; overflow: hidden;
+    background: #000;
+  }
+
+  /* Multi-colour ambient glows */
+  .hero-glow-1 { position: absolute; width: 500px; height: 500px; border-radius: 50%; top: 30%; left: 20%; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%); animation: glow-drift 8s ease-in-out infinite; pointer-events: none; }
+  .hero-glow-2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; top: 50%; left: 80%; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(0,212,255,0.1) 0%, transparent 70%); animation: glow-drift 10s ease-in-out infinite reverse; pointer-events: none; }
+  .hero-glow-3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; top: 70%; left: 50%; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 70%); animation: glow-drift 12s ease-in-out infinite 2s; pointer-events: none; }
+
+  #tsparticles-hero { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+
+  /* ── CONE SPARKLE — narrow at top, wide at bottom (matches image) ── */
+  .hero-gradient-lines {
+    position: relative;
+    width: 60rem; max-width: 99vw;
+    height: 340px;
+    z-index: 2;
+    margin-top: -2px;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  /* Particle container clipped to trapezoid cone shape */
+  .cone-particle-wrap {
+    position: absolute; inset: 0;
+    /* narrow 22% wide at top-center, full width at bottom */
+    clip-path: polygon(39% 0%, 61% 0%, 100% 100%, 0% 100%);
+    overflow: hidden;
+  }
+
+  #tsparticles-line {
+    position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1;
+  }
+
+  /* Glowing horizon line — full width, sits above the cone */
+  .glow-line {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 6; pointer-events: none;
+  }
+  .gl-a { position: absolute; top: 0; left: 4%; right: 4%; height: 2px;
+    background: linear-gradient(90deg, transparent, #1a6eff 30%, #00c8ff 50%, #1a6eff 70%, transparent);
+    filter: blur(1px); }
+  .gl-b { position: absolute; top: 0; left: 4%; right: 4%; height: 1px;
+    background: linear-gradient(90deg, transparent, #3a8fff 25%, #b8eeff 45%, #e8f8ff 50%, #b8eeff 55%, #3a8fff 75%, transparent); }
+  .gl-c { position: absolute; top: -2px; left: 28%; right: 28%; height: 6px;
+    background: linear-gradient(90deg, transparent, #00d4ff, #c8f0ff, #00d4ff, transparent);
+    filter: blur(2px); }
+  .gl-d { position: absolute; top: -4px; left: 43%; right: 43%; height: 12px;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,1) 0%, rgba(120,210,255,0.7) 50%, transparent 100%);
+    filter: blur(3px); }
+
+  /* Bottom fade — dissolve dots into black */
+  .cone-bottom-fade {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 55%; z-index: 5; pointer-events: none;
+    background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 55%, black 100%);
+  }
+  /* Side fades — soften the hard cone edges */
+  .cone-side-fade {
+    position: absolute; inset: 0; z-index: 4; pointer-events: none;
+    background:
+      linear-gradient(to right, black 0%, transparent 22%, transparent 78%, black 100%);
+  }
+
+  .hero-content { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; }
+
+  /* Title + cone stacked tightly */
+  .hero-title-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .hero-tag { font-family: var(--mono); font-size: 12px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 24px; opacity: 0; animation: fadeUp 0.6s 0.2s forwards;
+    background: linear-gradient(90deg, var(--purple), var(--cyan), var(--amber));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    background-size: 200%; animation: fadeUp 0.6s 0.2s forwards, text-shimmer 4s linear infinite;
+  }
+
+  .hero-title { font-family: var(--condensed); font-size: clamp(56px, 8vw, 120px); font-weight: 900; line-height: 0.9; text-transform: uppercase; letter-spacing: -2px; color: #fff; margin-bottom: 4px; opacity: 0; animation: fadeUp 0.6s 0.4s forwards; }
+  .hero-title .accent {
+    background: linear-gradient(135deg, var(--amber) 0%, var(--pink) 40%, var(--purple) 80%, var(--cyan) 100%);
+    background-size: 300% 300%;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: gradient-shift 4s ease infinite;
+  }
+
+  .hero-sub { font-family: var(--condensed); font-size: clamp(20px, 3.5vw, 42px); font-weight: 700; color: var(--muted); letter-spacing: 6px; text-transform: uppercase; margin-bottom: 0; opacity: 0; animation: fadeUp 0.6s 0.5s forwards; }
+  .hero-desc { max-width: 620px; font-size: 17px; font-weight: 300; line-height: 1.7; color: var(--text); margin-top: 32px; margin-bottom: 48px; opacity: 0; animation: fadeUp 0.6s 0.8s forwards; }
+  .hero-ctas { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; opacity: 0; animation: fadeUp 0.6s 1s forwards; }
+
+  /* ── LAUNCH BUTTON — rainbow shimmer + particle burst ── */
+  .btn-primary {
+    font-family: var(--mono); font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 15px 40px; border: none; cursor: pointer; text-decoration: none; display: inline-flex;
+    align-items: center; gap: 10px; font-weight: 700; position: relative; overflow: hidden;
+    border-radius: 3px; color: #fff;
+    background: linear-gradient(135deg, #7c3aed, #2563eb, #0891b2, #059669);
+    background-size: 300% 300%;
+    animation: gradient-shift 3s ease infinite;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.25s;
+  }
+  /* Shine sweep on hover */
+  .btn-primary::before {
+    content: '';
+    position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.5s;
+  }
+  /* Outer glow ring */
+  .btn-primary::after {
+    content: '';
+    position: absolute; inset: -3px;
+    background: linear-gradient(135deg, var(--purple), var(--cyan), var(--pink), var(--amber));
+    background-size: 300% 300%;
+    animation: gradient-shift 3s ease infinite;
+    z-index: -1; border-radius: 4px; opacity: 0;
+    filter: blur(8px);
+    transition: opacity 0.3s;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+  }
+  .btn-primary:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 16px 40px rgba(124,58,237,0.45); }
+  .btn-primary:hover::before { left: 140%; }
+  .btn-primary:hover::after { opacity: 1; }
+  .btn-primary:active { transform: translateY(0) scale(0.98); }
+  /* Pulsing ring animation */
+  .btn-primary .ring {
+    position: absolute; inset: 0;
+    border-radius: 3px;
+    box-shadow: 0 0 0 0 rgba(139,92,246,0.6);
+    animation: btn-pulse 2.5s ease-out infinite;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+  }
+  .btn-icon { font-size: 16px; transition: transform 0.3s; }
+  .btn-primary:hover .btn-icon { transform: translateX(4px); }
+
+  /* ── SECONDARY BUTTON — neon border trace ── */
+  .btn-secondary {
+    font-family: var(--mono); font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 15px 40px; background: transparent; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 10px; position: relative; border-radius: 3px;
+    color: var(--cyan); transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), color 0.3s;
+    border: none;
+  }
+  /* Animated border using SVG-like gradient border */
+  .btn-secondary::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 3px; padding: 1px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple), var(--pink), var(--cyan));
+    background-size: 300% 300%;
+    animation: gradient-shift 3s ease infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  /* Inner glow on hover */
+  .btn-secondary::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,212,255,0.08), rgba(139,92,246,0.08));
+    opacity: 0; transition: opacity 0.3s; border-radius: 3px;
+  }
+  .btn-secondary:hover { transform: translateY(-3px); color: #fff; }
+  .btn-secondary:hover::after { opacity: 1; }
+  .btn-secondary:active { transform: translateY(0); }
+  .btn-secondary .btn-icon { font-size: 14px; transition: transform 0.3s; }
+  .btn-secondary:hover .btn-icon { transform: translateY(-2px); }
+
+  /* ── TICKER ── */
+  .ticker { position: relative; overflow: hidden; white-space: nowrap; padding: 11px 0;
+    background: linear-gradient(90deg, var(--purple), var(--blue), var(--cyan), var(--green), var(--amber), var(--pink), var(--purple));
+    background-size: 300% 100%;
+    animation: ticker-bg 8s linear infinite;
+  }
+  .ticker-inner { display: inline-flex; animation: ticker 24s linear infinite; }
+  .ticker-item { font-family: var(--mono); font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: rgba(255,255,255,0.9); padding: 0 48px; font-weight: 700; }
+  .ticker-item::before { content: '▸ '; }
+
+  /* ── SECTIONS ── */
+  section { padding: 100px 48px; }
+  .section-label { font-family: var(--mono); font-size: 11px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(90deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .section-label::before { content: ''; width: 32px; height: 1px; background: linear-gradient(90deg, var(--amber), var(--pink)); flex-shrink: 0; -webkit-text-fill-color: unset; }
+  .section-title { font-family: var(--condensed); font-size: clamp(36px, 5vw, 64px); font-weight: 900; text-transform: uppercase; color: #fff; line-height: 1; letter-spacing: -1px; margin-bottom: 20px; }
+  .section-desc { font-size: 16px; font-weight: 300; color: var(--muted); line-height: 1.7; max-width: 560px; }
+
+  /* ── STATS ── */
+  .stats-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0 48px; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stat-item { padding: 40px 32px; border-right: 1px solid var(--border); opacity: 0; animation: fadeUp 0.5s forwards; }
+  .stat-item:last-child { border-right: none; }
+  .stat-item:nth-child(1){animation-delay:.1s}.stat-item:nth-child(2){animation-delay:.2s}.stat-item:nth-child(3){animation-delay:.3s}.stat-item:nth-child(4){animation-delay:.4s}
+  .stat-num { font-family: var(--condensed); font-size: 52px; font-weight: 900; line-height: 1; margin-bottom: 6px;
+    background: linear-gradient(135deg, #fff 0%, var(--cyan) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .stat-num .unit { font-size: 24px;
+    background: linear-gradient(135deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .stat-label { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── FEATURES ── */
+  .features { max-width: 1400px; margin: 0 auto; }
+  .features-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 64px; flex-wrap: wrap; gap: 24px; }
+  .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+  .feature-card { background: var(--card); padding: 40px 36px; position: relative; overflow: hidden; transition: background 0.3s, transform 0.3s; }
+  .feature-card:hover { background: #111e2e; transform: translateY(-2px); }
+  .feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent, linear-gradient(90deg, var(--purple), var(--cyan))); transform: scaleX(0); transform-origin: left; transition: transform 0.4s; }
+  .feature-card:hover::before { transform: scaleX(1); }
+  /* Corner glow */
+  .feature-card::after { content: ''; position: absolute; width: 120px; height: 120px; border-radius: 50%; top: -40px; right: -40px; background: var(--corner-glow, rgba(139,92,246,0.06)); opacity: 0; transition: opacity 0.4s; }
+  .feature-card:hover::after { opacity: 1; }
+  .feature-icon { font-size: 30px; margin-bottom: 20px; display: block; }
+  .feature-title { font-family: var(--condensed); font-size: 22px; font-weight: 700; text-transform: uppercase; color: #fff; letter-spacing: 1px; margin-bottom: 12px; }
+  .feature-desc { font-size: 14px; font-weight: 300; color: var(--muted); line-height: 1.7; }
+  .feature-tag { margin-top: 20px; font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── CLASSES ── */
+  .classes-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .classes-inner { max-width: 1400px; margin: 0 auto; }
+  .classes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 56px; }
+  .class-card { background: var(--card); border: 1px solid var(--border); padding: 24px 16px; text-align: center; position: relative; transition: all 0.3s; }
+  .class-card:hover { border-color: var(--class-color, var(--purple)); transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .class-card.ignored { opacity: 0.3; }
+  .class-card.ignored::after { content: 'IGNORED'; position: absolute; top: 8px; right: 8px; font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+  .class-card.alert::after { content: 'ALERT'; position: absolute; top: 8px; right: 8px; font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+    background: linear-gradient(90deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .class-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--class-color, var(--muted)); margin: 0 auto 14px; box-shadow: 0 0 8px var(--class-color, transparent); }
+  .class-name { font-family: var(--condensed); font-size: 13px; font-weight: 700; text-transform: uppercase; color: #fff; letter-spacing: 0.5px; line-height: 1.3; }
+  .class-sev { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  /* ── HOW IT WORKS ── */
+  .how-inner { max-width: 1400px; margin: 0 auto; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 64px; position: relative; }
+  .steps::before { content: ''; position: absolute; top: 28px; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--purple), var(--cyan), var(--pink), transparent);
+  }
+  .step { padding: 0 32px; text-align: center; position: relative; }
+  .step-num { width: 56px; height: 56px; border: 1px solid var(--border); background: var(--card); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-family: var(--mono); font-size: 16px; position: relative; z-index: 1; transition: all 0.35s;
+    background: linear-gradient(135deg, var(--purple), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    border-color: rgba(139,92,246,0.3);
+  }
+  .step:hover .step-num { border-color: var(--purple); box-shadow: 0 0 24px rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); transform: scale(1.1); -webkit-text-fill-color: transparent; }
+  .step-title { font-family: var(--condensed); font-size: 18px; font-weight: 700; text-transform: uppercase; color: #fff; letter-spacing: 1px; margin-bottom: 12px; }
+  .step-desc { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.7; }
+
+  /* ── TERMINAL ── */
+  .terminal-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .terminal-inner { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+  .terminal { background: #030508; border: 1px solid rgba(139,92,246,0.25); border-radius: 4px; overflow: hidden; font-family: var(--mono); box-shadow: 0 0 40px rgba(139,92,246,0.08); }
+  .terminal-bar { background: #080c12; border-bottom: 1px solid rgba(139,92,246,0.2); padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+  .t-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .t-dot.red{background:#ff5f57}.t-dot.amber{background:#febc2e}.t-dot.green{background:#28c840}
+  .terminal-title { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: 8px; letter-spacing: 1px; }
+  .terminal-body { padding: 24px; font-size: 13px; line-height: 2; }
+  .t-comment{color:#2d4a5e}.t-prompt{color:var(--muted)}.t-cmd{color:var(--cyan)}.t-flag{color:var(--amber)}.t-val{color:var(--green)}.t-output{color:var(--text)}.t-alarm{
+    background: linear-gradient(90deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .t-shot{color:var(--purple)}
+  .t-cursor { display: inline-block; width: 8px; height: 14px; background: linear-gradient(180deg, var(--purple), var(--cyan)); vertical-align: middle; animation: blink 1s step-end infinite; }
+
+  /* ── CONFIG ── */
+  .config-section { max-width: 1400px; margin: 0 auto; }
+  .config-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 56px; }
+  .config-card { background: var(--card); border: 1px solid var(--border); padding: 32px; position: relative; overflow: hidden; transition: border-color 0.3s; }
+  .config-card:hover { border-color: rgba(139,92,246,0.3); }
+  .config-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--purple), var(--cyan), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .config-card:hover::before { opacity: 1; }
+  .config-card-title { font-family: var(--condensed); font-size: 18px; font-weight: 700; text-transform: uppercase; color: #fff; letter-spacing: 1px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+  .config-card-title span { font-size: 13px; font-family: var(--mono); font-weight: 400; text-transform: none; letter-spacing: 0;
+    background: linear-gradient(90deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .config-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(26,42,58,0.6); font-size: 13px; flex-wrap: wrap; gap: 6px; }
+  .config-row:last-child { border-bottom: none; }
+  .config-key { font-family: var(--mono); color: var(--cyan); font-size: 12px; }
+  .config-val { font-family: var(--mono); color: var(--amber); font-size: 12px; }
+  .config-note { color: var(--muted); font-size: 12px; font-weight: 300; }
+
+  /* ── FOOTER ── */
+  footer { background: var(--surface); border-top: 1px solid rgba(139,92,246,0.15); padding: 48px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+  .footer-logo { font-family: var(--condensed); font-size: 20px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .footer-logo span {
+    background: linear-gradient(90deg, var(--amber), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .footer-info { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1px; text-align: center; line-height: 1.8; }
+  .footer-stack { display: flex; gap: 12px; flex-wrap: wrap; }
+  .stack-tag { font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px solid var(--border); padding: 4px 10px; letter-spacing: 1px; transition: all 0.2s; }
+  .stack-tag:hover { border-color: rgba(139,92,246,0.4); color: var(--cyan); }
+
+  /* ── KEYFRAMES ── */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+  @keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  @keyframes text-shimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  @keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  @keyframes ticker-bg { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes glow-drift { 0%,100%{transform:translate(-50%,-50%) scale(1)} 33%{transform:translate(-45%,-55%) scale(1.1)} 66%{transform:translate(-55%,-45%) scale(0.95)} }
+  @keyframes btn-pulse { 0%{box-shadow:0 0 0 0 rgba(139,92,246,0.5)} 70%{box-shadow:0 0 0 14px rgba(139,92,246,0)} 100%{box-shadow:0 0 0 0 rgba(139,92,246,0)} }
+
+  .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:1100px){
+    .features-grid{grid-template-columns:repeat(2,1fr)}.classes-grid{grid-template-columns:repeat(4,1fr)}
+    .steps{grid-template-columns:repeat(2,1fr);gap:48px}.steps::before{display:none}
+    .terminal-inner{grid-template-columns:1fr}.stats-bar{grid-template-columns:repeat(2,1fr)}
+    .stat-item:nth-child(2){border-right:none}
+  }
+  @media(max-width:768px){
+    nav{padding:0 20px}.nav-links{display:none}.nav-launch{display:none}
+    section{padding:72px 24px}.hero{padding:100px 24px 60px}
+    .features-grid{grid-template-columns:1fr}.classes-grid{grid-template-columns:repeat(2,1fr)}
+    .steps{grid-template-columns:1fr}.config-grid{grid-template-columns:1fr}
+    .stats-bar{grid-template-columns:1fr;padding:0 24px}
+    .stat-item{border-right:none;border-bottom:1px solid var(--border)}
+    footer{padding:32px 24px}.hero-gradient-lines{width:98vw;height:260px}
+    .hero-ctas{flex-direction:column;align-items:center}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Sentinel<span>Eye</span></div>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#classes">Classes</a></li>
+    <li><a href="#howitworks">How It Works</a></li>
+    <li><a href="#usage">Quick Start</a></li>
+    <li><a href="#config">Config</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="nav-badge">AI Online</div>
+    <a href="/app" class="nav-launch"><span>Launch App</span></a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-glow-1"></div>
+  <div class="hero-glow-2"></div>
+  <div class="hero-glow-3"></div>
+  <div id="tsparticles-hero"></div>
+
+  <div class="hero-content">
+    <div class="hero-tag">YOLOv8 · WebSocket · FastAPI · MongoDB · v2.4</div>
+
+    <!-- Title + cone directly below it, just like the Acme image -->
+    <div class="hero-title-wrap">
+      <h1 class="hero-title">SENTINEL<br><span class="accent">EYE</span></h1>
+
+      <!-- Cone sparkle — exactly like the Acme image: glow line + fan of dots below -->
+      <div class="hero-gradient-lines">
+        <!-- Clipped to trapezoid: dots only inside cone shape -->
+        <div class="cone-particle-wrap">
+          <div id="tsparticles-line"></div>
+        </div>
+        <!-- Glow line at top of cone -->
+        <div class="glow-line">
+          <div class="gl-a"></div>
+          <div class="gl-b"></div>
+          <div class="gl-c"></div>
+          <div class="gl-d"></div>
+        </div>
+        <!-- Side + bottom fades -->
+        <div class="cone-side-fade"></div>
+        <div class="cone-bottom-fade"></div>
+      </div>
+    </div>
+
+    <div class="hero-sub">AI Exam Monitoring System</div>
+    <p class="hero-desc">
+      Full-stack real-time exam malpractice detection. YOLOv8 monitors 5 violation classes
+      via live RTSP cameras or uploaded video. Annotated frames stream to the browser via
+      WebSocket. Every alert is logged, every violation is snapshotted with bounding boxes.
+    </p>
+    <div class="hero-ctas">
+      <a href="/app" class="btn-primary">
+        <div class="ring"></div>
+        <span>Launch App</span>
+        <span class="btn-icon">→</span>
+      </a>
+      <a href="#features" class="btn-secondary">
+        <span>Learn More</span>
+        <span class="btn-icon">↓</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span class="ticker-item">Phone Detection</span>
+    <span class="ticker-item">Hand Under Table</span>
+    <span class="ticker-item">Look Around</span>
+    <span class="ticker-item">Wave Detection</span>
+    <span class="ticker-item">Bend Over Desk</span>
+    <span class="ticker-item">Auto Snapshot</span>
+    <span class="ticker-item">WebSocket Streaming</span>
+    <span class="ticker-item">Live HUD Overlay</span>
+    <span class="ticker-item">MongoDB Logging</span>
+    <span class="ticker-item">RTSP Compatible</span>
+    <span class="ticker-item">Phone Detection</span>
+    <span class="ticker-item">Hand Under Table</span>
+    <span class="ticker-item">Look Around</span>
+    <span class="ticker-item">Wave Detection</span>
+    <span class="ticker-item">Bend Over Desk</span>
+    <span class="ticker-item">Auto Snapshot</span>
+    <span class="ticker-item">WebSocket Streaming</span>
+    <span class="ticker-item">Live HUD Overlay</span>
+    <span class="ticker-item">MongoDB Logging</span>
+    <span class="ticker-item">RTSP Compatible</span>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-num">5<span class="unit"> cls</span></div><div class="stat-label">Violation Classes</div></div>
+  <div class="stat-item"><div class="stat-num">30<span class="unit"> fps</span></div><div class="stat-label">WebSocket Stream</div></div>
+  <div class="stat-item"><div class="stat-num">10<span class="unit"> sec</span></div><div class="stat-label">Alert Cooldown</div></div>
+  <div class="stat-item"><div class="stat-num">∞<span class="unit"> cam</span></div><div class="stat-label">Camera Support</div></div>
+</div>
+
+<!-- FEATURES -->
+<section id="features" style="background:var(--bg);">
+  <div class="features">
+    <div class="features-header reveal">
+      <div><div class="section-label">Capabilities</div><h2 class="section-title">Built For<br>Real Exams</h2></div>
+      <p class="section-desc">Every component is designed for exam hall conditions — multiple cameras, long sessions, live streaming and full alert history stored in MongoDB.</p>
+    </div>
+    <div class="features-grid reveal">
+      <div class="feature-card" style="--accent:linear-gradient(90deg,var(--purple),var(--cyan));--corner-glow:rgba(139,92,246,0.1);">
+        <span class="feature-icon">🎯</span>
+        <div class="feature-title">YOLOv8 Inference</div>
+        <p class="feature-desc">Custom trained YOLOv8 model detects 5 violation classes per frame. Per-type confidence thresholds minimize false positives in crowded exam halls.</p>
+        <div class="feature-tag" style="background:linear-gradient(90deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Real-Time AI</div>
+      </div>
+      <div class="feature-card" style="--accent:linear-gradient(90deg,var(--cyan),var(--green));--corner-glow:rgba(0,212,255,0.08);">
+        <span class="feature-icon">📡</span>
+        <div class="feature-title">WebSocket Streaming</div>
+        <p class="feature-desc">Annotated JPEG frames base64-encoded and pushed to the browser via WebSocket at up to 30fps. No polling. No refresh. Live bounding boxes.</p>
+        <div class="feature-tag" style="background:linear-gradient(90deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Live Feed</div>
+      </div>
+      <div class="feature-card" style="--accent:linear-gradient(90deg,var(--green),var(--amber));--corner-glow:rgba(0,255,136,0.08);">
+        <span class="feature-icon">📸</span>
+        <div class="feature-title">Auto Snapshots</div>
+        <p class="feature-desc">Violation frames saved with bounding boxes and HUD overlay. Per-type 10s cooldown prevents duplicate saves. View all snapshots in browser gallery.</p>
+        <div class="feature-tag" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Evidence Capture</div>
+      </div>
+      <div class="feature-card" style="--accent:linear-gradient(90deg,var(--amber),var(--pink));--corner-glow:rgba(245,158,11,0.08);">
+        <span class="feature-icon">🗄️</span>
+        <div class="feature-title">MongoDB Logging</div>
+        <p class="feature-desc">Every alert is recorded in MongoDB with session ID, classroom, camera, frame number and timestamp. Dashboard shows total alert count across all rooms.</p>
+        <div class="feature-tag" style="background:linear-gradient(90deg,var(--amber),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Full Audit Trail</div>
+      </div>
+      <div class="feature-card" style="--accent:linear-gradient(90deg,var(--pink),var(--purple));--corner-glow:rgba(236,72,153,0.08);">
+        <span class="feature-icon">📹</span>
+        <div class="feature-title">Multi-Camera Support</div>
+        <p class="feature-desc">Add unlimited RTSP/IP cameras per classroom. Switch between cameras live without disconnecting. Each switch resets per-type cooldown automatically.</p>
+        <div class="feature-tag" style="background:linear-gradient(90deg,var(--pink),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">RTSP · IP Cam</div>
+      </div>
+      <div class="feature-card" style="--accent:linear-gradient(90deg,var(--purple),var(--pink));--corner-glow:rgba(139,92,246,0.1);">
+        <span class="feature-icon">🎬</span>
+        <div class="feature-title">Video File Analysis</div>
+        <p class="feature-desc">Upload MP4, AVI or MOV recordings. YOLOv8 processes every frame with a live progress bar. Results stream to browser exactly like a real camera feed.</p>
+        <div class="feature-tag" style="background:linear-gradient(90deg,var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">MP4 · AVI · MOV</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLASSES -->
+<section id="classes" class="classes-section">
+  <div class="classes-inner">
+    <div class="reveal"><div class="section-label">Detection Classes</div><h2 class="section-title">What Gets<br>Detected</h2></div>
+    <div class="classes-grid reveal">
+      <div class="class-card alert" style="--class-color:#ef4444;"><div class="class-dot" style="background:#ef4444;"></div><div class="class-name">Phone</div><div class="class-sev">critical</div></div>
+      <div class="class-card alert" style="--class-color:#00d4ff;"><div class="class-dot" style="background:#00d4ff;"></div><div class="class-name">Hand Under Table</div><div class="class-sev">critical</div></div>
+      <div class="class-card alert" style="--class-color:#fbbf24;"><div class="class-dot" style="background:#fbbf24;"></div><div class="class-name">Look Around</div><div class="class-sev">warning</div></div>
+      <div class="class-card alert" style="--class-color:#8b5cf6;"><div class="class-dot" style="background:#8b5cf6;"></div><div class="class-name">Wave</div><div class="class-sev">warning</div></div>
+      <div class="class-card" style="--class-color:#ec4899;"><div class="class-dot" style="background:#ec4899;"></div><div class="class-name">Bend Over Desk</div><div class="class-sev">info</div></div>
+      </div>
+    <div style="margin-top:24px;display:flex;gap:24px;flex-wrap:wrap;" class="reveal">
+        <div style="width:8px;height:8px;background:linear-gradient(135deg,var(--amber),var(--pink));border-radius:50%;"></div>
+        <span style="background:linear-gradient(90deg,var(--amber),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">ALERT — DB log + browser alert + snapshot</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted);">
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="howitworks">
+  <div class="how-inner">
+    <div class="reveal"><div class="section-label">Pipeline</div><h2 class="section-title">How It<br>Works</h2></div>
+    <div class="steps">
+      <div class="step reveal" style="transition-delay:.1s"><div class="step-num">01</div><div class="step-title">Connect Source</div><p class="step-desc">Select a classroom, choose Video Mode or Real-Time. Upload a video file or enter your RTSP IP camera stream URL.</p></div>
+      <div class="step reveal" style="transition-delay:.2s"><div class="step-num">02</div><div class="step-title">YOLOv8 Inference</div><p class="step-desc">FastAPI runs YOLOv8 on each frame in a thread pool. Ignored classes are skipped. Per-type confidence filters applied.</p></div>
+      <div class="step reveal" style="transition-delay:.3s"><div class="step-num">03</div><div class="step-title">Stream to Browser</div><p class="step-desc">Annotated JPEG frames are base64-encoded and pushed via WebSocket. Browser renders live feed with bounding boxes and HUD overlay.</p></div>
+      <div class="step reveal" style="transition-delay:.4s"><div class="step-num">04</div><div class="step-title">Log &amp; Alert</div><p class="step-desc">Every violation saved to MongoDB. Browser shows cooldown-controlled alerts. Snapshots saved to disk with bounding boxes as evidence.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL -->
+<section id="usage" class="terminal-section">
+  <div class="terminal-inner">
+    <div class="reveal">
+      <div class="section-label">Quick Start</div>
+      <h2 class="section-title">Up &amp; Running<br>In Minutes</h2>
+      <p class="section-desc" style="margin-bottom:32px;">Start the FastAPI server, register an account and begin monitoring immediately.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:1px;">REQUIREMENTS</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="background:var(--card);border:1px solid rgba(0,212,255,0.2);padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--cyan);">Python 3.10+</div>
+          <div style="background:var(--card);border:1px solid rgba(0,212,255,0.2);padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--cyan);">MongoDB</div>
+          <div style="background:var(--card);border:1px solid rgba(139,92,246,0.3);padding:8px 16px;font-family:var(--mono);font-size:12px;background:linear-gradient(90deg,var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">best.pt</div>
+        </div>
+      </div>
+    </div>
+    <div class="terminal reveal" style="transition-delay:.2s">
+      <div class="terminal-bar">
+        <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
+        <div class="terminal-title">PowerShell — SentinelEye Backend</div>
+      </div>
+      <div class="terminal-body">
+        <div class="t-comment"># Install dependencies</div>
+        <div><span class="t-prompt">PS&gt; </span><span class="t-cmd">pip install</span> <span class="t-val">-r requirements.txt</span></div><br>
+        <div class="t-comment"># Place best.pt in backend folder then start</div>
+        <div><span class="t-prompt">PS&gt; </span><span class="t-cmd">cd</span> <span class="t-val">backend</span></div>
+        <div><span class="t-prompt">PS&gt; </span><span class="t-cmd">uvicorn</span> main:app <span class="t-flag">--host</span> <span class="t-val">0.0.0.0</span> <span class="t-flag">--port</span> <span class="t-val">8000</span> <span class="t-flag">--reload</span></div><br>
+        <div class="t-output">  SentinelEye starting up…</div>
+        <div class="t-output">  MongoDB connected — sentinel_eye</div>
+        <div class="t-val">  Uvicorn running on http://0.0.0.0:8000</div>
+        <div class="t-alarm">  [ALERT] Phone detected — frame 142</div>
+        <div class="t-shot">  [SNAPSHOT] snapshots/violation_20260322_...jpg</div>
+        <div><span class="t-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONFIG -->
+<section id="config">
+  <div class="config-section">
+    <div class="reveal"><div class="section-label">Configuration</div><h2 class="section-title">Settings<br>Reference</h2></div>
+    <div class="config-grid reveal">
+      <div class="config-card">
+        <div class="config-card-title">Environment <span>.env file</span></div>
+        <div class="config-row"><span class="config-key">MONGODB_URL</span><span class="config-val">localhost:27017</span><span class="config-note">Local or Atlas URI</span></div>
+        <div class="config-row"><span class="config-key">MONGODB_DB</span><span class="config-val">sentinel_eye</span><span class="config-note">Database name</span></div>
+        <div class="config-row"><span class="config-key">YOLO_MODEL</span><span class="config-val">best.pt</span><span class="config-note">YOLOv8 weights file</span></div>
+        <div class="config-row"><span class="config-key">YOLO_CONF</span><span class="config-val">0.40</span><span class="config-note">Base confidence threshold</span></div>
+        <div class="config-row"><span class="config-key">FRAME_SKIP</span><span class="config-val">2</span><span class="config-note">Process every Nth frame</span></div>
+        <div class="config-row"><span class="config-key">MAX_FILE_SIZE_MB</span><span class="config-val">500</span><span class="config-note">Max upload size</span></div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">Cooldowns <span>seconds</span></div>
+        <div class="config-row"><span class="config-key">ALERT_COOLDOWN_SEC</span><span class="config-val">10 s</span><span class="config-note">Min gap between browser alerts</span></div>
+        <div class="config-row"><span class="config-key">SNAP_COOLDOWN_SEC</span><span class="config-val">10 s</span><span class="config-note">Min gap between snapshots</span></div>
+        <div class="config-row"><span class="config-key">DB Logging</span><span class="config-val">Every alert</span><span class="config-note">No cooldown — full history</span></div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">Severity Levels <span>by class</span></div>
+        <div class="config-row"><span class="config-key">phone</span><span class="config-val" style="color:#ef4444;">critical</span><span class="config-note">Highest priority</span></div>
+        <div class="config-row"><span class="config-key">Hand Under Table</span><span class="config-val" style="color:#ef4444;">critical</span><span class="config-note">Concealed device risk</span></div>
+        <div class="config-row"><span class="config-key">Look Around</span><span class="config-val" style="color:var(--amber);">warning</span><span class="config-note">Possible copying</span></div>
+        <div class="config-row"><span class="config-key">Wave</span><span class="config-val" style="color:var(--purple);">warning</span><span class="config-note">Signalling attempt</span></div>
+        <div class="config-row"><span class="config-key">Bend Over Desk</span><span class="config-val" style="color:var(--cyan);">info</span><span class="config-note">Unusual posture</span></div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">API Endpoints <span>FastAPI</span></div>
+        <div class="config-row"><span class="config-key">POST /api/auth/login</span><span class="config-note">JWT authentication</span></div>
+        <div class="config-row"><span class="config-key">POST /api/detection/upload</span><span class="config-note">Upload video file</span></div>
+        <div class="config-row"><span class="config-key">WS /ws/video/{id}</span><span class="config-note">Stream video frames</span></div>
+        <div class="config-row"><span class="config-key">WS /ws/{session}</span><span class="config-note">Live camera stream</span></div>
+        <div class="config-row"><span class="config-key">GET /api/docs</span><span class="config-note">Swagger UI</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Sentinel<span>Eye</span></div>
+  <div class="footer-info">AI-Powered Exam Monitoring System · v2.4.0<br>YOLOv8 · FastAPI · MongoDB · WebSocket · OpenCV</div>
+  <div class="footer-stack">
+    <div class="stack-tag">YOLOv8</div>
+    <div class="stack-tag">FastAPI</div>
+    <div class="stack-tag">MongoDB</div>
+    <div class="stack-tag">WebSocket</div>
+    <div class="stack-tag">OpenCV</div>
+    <div class="stack-tag">Python 3.10</div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.12.0/tsparticles.slim.bundle.min.js"></script>
+<script>
+(async () => {
+  // Full hero — multi-colour sparkles
+  await tsParticles.load({
+    id: "tsparticles-hero",
+    options: {
+      background: { color: { value: "#000000" } },
+      fullScreen: { enable: false },
+      fpsLimit: 120,
+      detectRetina: true,
+      particles: {
+        number: { value: 140, density: { enable: true, width: 900, height: 900 } },
+        color: { value: ["#ffffff", "#8b5cf6", "#00d4ff", "#ec4899", "#f59e0b"] },
+        shape: { type: "circle" },
+        opacity: {
+          value: { min: 0.05, max: 0.9 },
+          animation: { enable: true, speed: 1.5, sync: false, startValue: "random" }
+        },
+        size: {
+          value: { min: 0.4, max: 1.6 },
+        },
+        move: {
+          enable: true,
+          speed: { min: 0.05, max: 0.5 },
+          direction: "none", random: true, straight: false,
+          outModes: { default: "out" }
+        },
+        links: { enable: false }
+      },
+      interactivity: {
+        events: { onClick: { enable: true, mode: "push" }, onHover: { enable: false } },
+        modes: { push: { quantity: 6 } }
+      }
+    }
+  });
+
+  // Static sparkles — clip-path cone does all the shaping
+  await tsParticles.load({
+    id: "tsparticles-line",
+    options: {
+      background: { color: { value: "transparent" } },
+      fullScreen: { enable: false },
+      fpsLimit: 120,
+      detectRetina: true,
+      particles: {
+        number: {
+          value: 500,
+          density: { enable: true, width: 600, height: 380 }
+        },
+        color: { value: ["#ffffff", "#c0e8ff", "#d0eeff", "#e8f4ff"] },
+        shape: { type: "circle" },
+        opacity: {
+          value: { min: 0.05, max: 0.95 },
+          animation: { enable: true, speed: 1.5, sync: false, startValue: "random", mode: "auto" }
+        },
+        size: {
+          value: { min: 0.3, max: 2.2 },
+          animation: { enable: false }
+        },
+        move: {
+          enable: true,
+          speed: { min: 0.05, max: 0.3 },
+          direction: "none",
+          random: true,
+          straight: false,
+          outModes: { default: "out" }
+        },
+        links: { enable: false }
+      },
+      interactivity: {
+        events: { onHover: { enable: false }, onClick: { enable: false } }
+      }
+    }
+  });
+})();
+
+// Scroll reveal
+const observer = new IntersectionObserver(
+  entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+  { threshold: 0.1 }
+);
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Animated stat counters
+const statsObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const nums = e.target.querySelectorAll('.stat-num');
+    const targets = [5, 30, 10, 99];
+    const units   = [' cls', ' fps', ' sec', ' cam'];
+    nums.forEach((el, i) => {
+      if (i === 3) { el.innerHTML = '∞<span class="unit"> cam</span>'; return; }
+      let s = 0;
+      const step = ts => {
+        if (!s) s = ts;
+        const p = Math.min((ts - s) / 1200, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        el.innerHTML = Math.floor(ease * targets[i]) + `<span class="unit">${units[i]}</span>`;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    statsObs.disconnect();
+  });
+}, { threshold: 0.5 });
+
+const statsBar = document.querySelector('.stats-bar');
+if (statsBar) statsObs.observe(statsBar);
+</script>
+</body>
+</html>
