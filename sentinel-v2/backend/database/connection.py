@@ -40,3 +40,7 @@ async def _create_indexes():
 
 def get_db():
     return db
+
+
+def is_db_connected() -> bool:
+    return db is not None

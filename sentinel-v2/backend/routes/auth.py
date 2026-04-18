@@ -18,6 +18,13 @@ logger = logging.getLogger("sentinel.auth")
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
+def _require_db():
+    db = get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable. Start MongoDB or use demo mode.")
+    return db
+
+
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
 class UserCreate(BaseModel):
     username:  str
@@ -74,7 +81,7 @@ async def get_current_user(token: str = Depends(oauth2)) -> dict:
     uid = payload.get("sub")
     if not uid:
         raise HTTPException(401, "Bad token payload")
-    db   = get_db()
+    db   = _require_db()
     user = await db.users.find_one({"_id": ObjectId(uid)})
     if not user:
         raise HTTPException(401, "User not found")
@@ -84,7 +91,7 @@ async def get_current_user(token: str = Depends(oauth2)) -> dict:
 # ── Routes ────────────────────────────────────────────────────────────────────
 @router.post("/register", status_code=201)
 async def register(data: UserCreate):
-    db = get_db()
+    db = _require_db()
     if await db.users.find_one({"email": data.email}):
         raise HTTPException(400, "Email already registered")
     if await db.users.find_one({"username": data.username}):
@@ -106,7 +113,7 @@ async def register(data: UserCreate):
 
 @router.post("/login")
 async def login(data: UserLogin):
-    db   = get_db()
+    db   = _require_db()
     user = await db.users.find_one({"email": data.email})
     if not user or not _verify_password(data.password, user["password"]):
         raise HTTPException(401, "Invalid email or password")

@@ -1,4 +1,4 @@
-# SentinelEye — AI-Powered Exam Monitoring System
+# SentinelEye � AI-Powered Exam Monitoring System
 
 ![Version](https://img.shields.io/badge/version-2.4.0-blue)
 ![Python](https://img.shields.io/badge/python-3.8+-green)
@@ -9,18 +9,18 @@ An intelligent, real-time exam cheating detection system powered by YOLOv8 compu
 
 ---
 
-## 🎯 Features
+## ?? Features
 
 ### Core Capabilities
 - **Real-Time Detection**: Live monitoring through RTSP/IP cameras with WebSocket streaming
 - **Video Analysis**: Upload and process recorded exam footage with frame-by-frame analysis
 - **Multi-Camera Support**: Monitor multiple examination rooms simultaneously
 - **5 Detection Classes**:
-  - 📱 Phone Detection
-  - 👋 Hand Under Table
-  - 👀 Look Around (suspicious head movements)
-  - 🙋 Wave (signaling gestures)
-  - 🧍 Bend Over Desk (unusual postures)
+  - ?? Phone Detection
+  - ?? Hand Under Table
+  - ?? Look Around (suspicious head movements)
+  - ?? Wave (signaling gestures)
+  - ?? Bend Over Desk (unusual postures)
 
 ### Technical Features
 - **YOLOv8 AI Model**: State-of-the-art object detection
@@ -40,36 +40,36 @@ An intelligent, real-time exam cheating detection system powered by YOLOv8 compu
 
 ---
 
-## 🏗️ Architecture
+## ??? Architecture
 
 ```
-┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│   Frontend      │◄────►│   FastAPI        │◄────►│   MongoDB       │
-│   (HTML/CSS/JS) │  WS  │   Backend        │      │   Database      │
-└─────────────────┘      └──────────────────┘      └─────────────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │   YOLOv8         │
-                         │   Detection      │
-                         └──────────────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │   OpenCV         │
-                         │   Video/Stream   │
-                         └──────────────────┘
++-----------------+      +------------------+      +-----------------+
+�   Frontend      �?----?�   FastAPI        �?----?�   MongoDB       �
+�   (HTML/CSS/JS) �  WS  �   Backend        �      �   Database      �
++-----------------+      +------------------+      +-----------------+
+                                  �
+                                  ?
+                         +------------------+
+                         �   YOLOv8         �
+                         �   Detection      �
+                         +------------------+
+                                  �
+                                  ?
+                         +------------------+
+                         �   OpenCV         �
+                         �   Video/Stream   �
+                         +------------------+
 ```
 
 ---
 
-## 🚀 Installation
+## ?? Installation
 
 ### Prerequisites
 - Python 3.8 or higher
 - MongoDB 4.4+
 - CUDA-capable GPU (recommended for real-time detection)
-- Node.js (for optional frontend development)
+- Node.js (optional, only if you want frontend tooling outside the static app)
 
 ### Backend Setup
 
@@ -87,39 +87,48 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. **Install dependencies**
 ```bash
+cd backend
 pip install -r requirements.txt
 ```
 
 4. **Configure environment variables**
 ```bash
-cp .env.example .env
-# Edit .env with your settings
+copy .env.example .env
 ```
+
+Then edit `.env` with your local settings.
 
 **.env file structure:**
 ```env
-# MongoDB
-MONGODB_URL=mongodb://localhost:27017
-DATABASE_NAME=sentineleye
+APP_NAME=SentinelEye
+DEBUG=false
 
 # JWT
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=change-this-in-production
 ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+
+# MongoDB
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DB=sentinel_eye
+
+# CORS
+ALLOWED_ORIGINS=["http://localhost:8000","http://127.0.0.1:8000","http://localhost:3000","http://localhost:5173"]
+
+# Uploads
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE_MB=500
+ALLOWED_VIDEO_EXTENSIONS=[".mp4",".avi",".mov",".mkv"]
 
 # Model
-MODEL_PATH=models/best.pt
-CONFIDENCE_THRESHOLD=0.5
-
-# Server
-HOST=0.0.0.0
-PORT=8000
+YOLO_MODEL=best.pt
+YOLO_CONF=0.40
+FRAME_SKIP=2
 ```
 
-5. **Download YOLOv8 model**
+5. **Place the YOLOv8 model**
 ```bash
-mkdir models
-# Place your trained best.pt model in models/
+# Put best.pt inside backend/
 ```
 
 6. **Start MongoDB**
@@ -129,29 +138,39 @@ mongod --dbpath /path/to/data
 
 7. **Run the backend**
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd backend
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+If Ultralytics cannot write to your default config directory on Windows, run with:
+
+```powershell
+$env:YOLO_CONFIG_DIR="D:\exam_v3\sentinel-v2\backend"
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 ### Frontend Setup
 
-The frontend is a single HTML file. You can:
+The frontend is static HTML served by FastAPI.
 
 1. **Option 1: Serve via FastAPI**
-   - The backend automatically serves `index.html` at `http://localhost:8000`
+   - Landing page: `http://127.0.0.1:8000/`
+   - App page: `http://127.0.0.1:8000/app`
 
 2. **Option 2: Use a local server**
 ```bash
+cd backend/static
 python -m http.server 8080
 # Open http://localhost:8080
 ```
 
 3. **Option 3: Open directly**
-   - Open `sentineleye-restyled.html` in a modern browser
-   - Demo mode will activate if backend is offline
+   - Open `backend/static/index.html` or `backend/static/landing.html` in a modern browser
+   - Backend-powered features will not work without FastAPI
 
 ---
 
-## 📖 Usage
+## ?? Usage
 
 ### 1. Login / Register
 - **Default Demo Credentials**: Any email/password works in demo mode
@@ -179,6 +198,32 @@ python -m http.server 8080
 4. Click "Start Monitoring"
 5. Switch between cameras
 6. View live alerts and statistics
+#### How to check whether realtime is working
+1. Start the app with start.bat
+2. Open http://127.0.0.1:<port>/health
+3. Confirm the response contains:
+   - "status": "ok"
+   - "database_ready": true for full backend connectivity
+4. In the dashboard, make sure the top badge shows BACKEND ONLINE
+   - If it shows DEMO MODE, realtime is not connected
+5. Open browser DevTools:
+   - Console: check for fetch or WebSocket errors
+   - Network -> WS: verify a realtime websocket opens and stays connected
+6. Watch the backend terminal for new requests or stream activity when you start monitoring
+7. Trigger a visible movement in front of the camera and check whether:
+   - live frames update
+   - alerts change
+   - snapshots or counters update
+#### Testing with VLC-compatible streams
+- Use the original camera stream URL, not a lc://... link
+- Supported test inputs are typically:
+  - tsp://username:password@ip:554/stream
+  - http://ip:port/video
+  - https://.../stream.m3u8
+- First test the URL in VLC
+- If VLC cannot open the stream, SentinelEye usually cannot open it either
+- Use only cameras and streams you own or are authorized to access
+- Do not use random public or unauthorized CCTV links
 
 ### 5. Camera Management
 - Add multiple cameras per room
@@ -188,7 +233,7 @@ python -m http.server 8080
 
 ---
 
-## 🔧 API Endpoints
+## ?? API Endpoints
 
 ### Authentication
 ```http
@@ -231,185 +276,39 @@ DELETE /api/alerts/classroom/{classroom_id}
 
 ---
 
-## 🎨 Styling Variants
+## ?? Actual Project Structure
 
-Two UI themes are provided:
-
-### Original (Amber/Orange Theme)
-- **File**: `index.html`
-- **Colors**: Amber (#f59e0b) primary
-- **Style**: Military/tactical aesthetic
-- **Fonts**: Share Tech Mono, Rajdhani, DM Sans
-
-### Restyled (Cyan/Purple Theme)
-- **File**: `sentineleye-restyled.html`
-- **Colors**: Cyan (#06b6d4) + Purple (#a855f7)
-- **Style**: Futuristic/modern aesthetic
-- **Fonts**: Orbitron, Exo 2, Inter
-- **Effects**: Glass-morphism, glowing elements
-
-Both versions have **identical functionality**!
-
----
-
-## 🤖 Training Your Own Model
-
-### Dataset Preparation
-1. **Collect training data**
-   - Exam footage with labeled violations
-   - Diverse lighting conditions
-   - Multiple camera angles
-
-2. **Label with LabelImg or Roboflow**
 ```
-classes:
-  0: phone
-  1: Hand Under Table
-  2: Look Around
-  3: Wave
-  4: Bend Over The Desk
-  5: Normal (optional, for non-violations)
-```
-
-3. **Train with YOLOv8**
-```python
-from ultralytics import YOLO
-
-# Load a model
-model = YOLO('yolov8n.pt')  # nano, small, medium, large, x
-
-# Train
-results = model.train(
-    data='exam_dataset.yaml',
-    epochs=100,
-    imgsz=640,
-    batch=16,
-    device=0  # GPU
-)
-
-# Export
-model.export(format='onnx')  # Optional: for deployment
-```
-
-4. **Save best.pt to models/ directory**
-
----
-
-## 📊 Performance
-
-### Hardware Requirements
-
-| Mode | Min GPU | Recommended GPU | FPS |
-|------|---------|-----------------|-----|
-| Video Analysis | GTX 1050 | RTX 3060+ | 15-20 |
-| Real-Time (1 cam) | GTX 1660 | RTX 3070+ | 25-30 |
-| Real-Time (4 cams) | RTX 3060 | RTX 4070+ | 15-20 each |
-
-### Detection Accuracy
-- **Phone Detection**: ~92% precision
-- **Behavior Detection**: ~85% precision (varies by posture)
-- **False Positive Rate**: <5% with proper training
-
----
-
-## 🛠️ Configuration
-
-### Video Analysis Settings
-```python
-# In detection service
-FRAME_SKIP = 2  # Process every Nth frame
-MAX_QUEUE_SIZE = 100
-BATCH_SIZE = 4
-```
-
-### Real-Time Settings
-```python
-# In WebSocket handler
-FPS_TARGET = 30
-RECONNECT_DELAY = 5  # seconds
-ALERT_COOLDOWN = 10  # seconds between same alerts
-```
-
-### Model Configuration
-```python
-# YOLOv8 parameters
-CONFIDENCE_THRESHOLD = 0.5
-IOU_THRESHOLD = 0.45
-MAX_DETECTIONS = 100
+sentinel-v2/
++-- backend/
+�   +-- database/
+�   �   +-- connection.py
+�   +-- routes/
+�   �   +-- alerts.py
+�   �   +-- auth.py
+�   �   +-- cameras.py
+�   �   +-- classrooms.py
+�   �   +-- detection.py
+�   +-- static/
+�   �   +-- index.html
+�   �   +-- landing.html
+�   +-- .env.example
+�   +-- best.pt
+�   +-- config.py
+�   +-- detector.py
+�   +-- exam_detector_v3.py
+�   +-- main.py
+�   +-- requirements.txt
++-- evaluation/
++-- frontend/
+�   +-- index.html
++-- README.md
++-- best.pt
 ```
 
 ---
 
-## 🐛 Troubleshooting
-
-### Backend won't start
-```bash
-# Check MongoDB is running
-mongosh
-# Check port 8000 is available
-lsof -i :8000
-# Reinstall dependencies
-pip install -r requirements.txt --force-reinstall
-```
-
-### Camera stream not working
-- Verify RTSP URL format: `rtsp://username:password@ip:port/stream`
-- Check camera is accessible: `ffplay rtsp://192.168.1.101:554/stream`
-- Firewall may be blocking RTSP ports
-
-### Low FPS in real-time mode
-- Reduce frame resolution in camera settings
-- Increase FRAME_SKIP value
-- Use GPU (CUDA) instead of CPU
-- Close other GPU-intensive applications
-
-### WebSocket disconnecting
-- Check backend logs for errors
-- Verify token hasn't expired
-- Check network stability
-- Increase timeout values
-
----
-
-## 📁 Project Structure
-
-```
-sentineleye/
-├── main.py                 # FastAPI application entry
-├── requirements.txt        # Python dependencies
-├── .env                   # Environment configuration
-├── models/
-│   └── best.pt           # Trained YOLOv8 model
-├── app/
-│   ├── api/
-│   │   ├── auth.py       # Authentication endpoints
-│   │   ├── classrooms.py # Classroom management
-│   │   ├── cameras.py    # Camera configuration
-│   │   ├── detection.py  # Detection endpoints
-│   │   └── alerts.py     # Alert management
-│   ├── services/
-│   │   ├── detection.py  # YOLOv8 detection logic
-│   │   ├── video.py      # Video processing
-│   │   └── stream.py     # RTSP stream handling
-│   ├── models/
-│   │   ├── user.py       # User database model
-│   │   ├── classroom.py  # Classroom model
-│   │   ├── camera.py     # Camera model
-│   │   └── alert.py      # Alert model
-│   └── core/
-│       ├── config.py     # Configuration
-│       ├── security.py   # JWT & hashing
-│       └── database.py   # MongoDB connection
-├── uploads/              # Temporary video uploads
-├── snapshots/            # Violation screenshots
-├── static/
-│   └── index.html       # Original UI (amber theme)
-└── sentineleye-restyled.html  # Cyan/purple theme UI
-```
-
----
-
-## 🔒 Security Considerations
+## ?? Security Considerations
 
 ### Production Deployment
 - [ ] Change default SECRET_KEY in .env
@@ -431,92 +330,4 @@ sentineleye/
 
 ---
 
-## 🌐 Browser Support
-
-| Browser | Version | Support |
-|---------|---------|---------|
-| Chrome | 90+ | ✅ Full |
-| Firefox | 88+ | ✅ Full |
-| Safari | 14+ | ✅ Full |
-| Edge | 90+ | ✅ Full |
-| Opera | 76+ | ✅ Full |
-
-**Required Features:**
-- WebSocket support
-- ES6+ JavaScript
-- CSS Grid & Flexbox
-- FileReader API
-- Canvas API
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📧 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/sentineleye/issues)
-- **Email**: support@sentineleye.com
-- **Documentation**: [Wiki](https://github.com/yourusername/sentineleye/wiki)
-
----
-
-## 🎓 Citation
-
-If you use SentinelEye in your research, please cite:
-
-```bibtex
-@software{sentineleye2024,
-  title = {SentinelEye: AI-Powered Exam Monitoring System},
-  author = {Your Name},
-  year = {2024},
-  url = {https://github.com/yourusername/sentineleye}
-}
-```
-
----
-
-## 🙏 Acknowledgments
-
-- **Ultralytics YOLOv8** - Object detection framework
-- **FastAPI** - Modern Python web framework
-- **OpenCV** - Computer vision library
-- **MongoDB** - Database system
-
----
-
-## 📊 Roadmap
-
-### v2.5 (Next Release)
-- [ ] Multi-language support (i18n)
-- [ ] Advanced analytics dashboard
-- [ ] Email/SMS alert notifications
-- [ ] Mobile app (React Native)
-- [ ] Cloud deployment guides (AWS, Azure, GCP)
-
-### v3.0 (Future)
-- [ ] Facial recognition for student identification
-- [ ] Audio analysis for verbal communication detection
-- [ ] Integration with LMS platforms (Moodle, Canvas)
-- [ ] AI-powered incident report generation
-- [ ] Blockchain-based audit trail
-
----
-
-**Built with ❤️ for academic integrity**
-
+**Built with ?? for academic integrity**
